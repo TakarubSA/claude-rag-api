@@ -53,5 +53,6 @@ def chat(
     )
 
     return {
+        "action":intent,
         "answer": answer
     }
