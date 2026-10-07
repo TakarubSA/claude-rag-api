@@ -132,7 +132,19 @@ handoff
             if result in allowed_actions:
                 return result
 
-            print("Unexpected Claude classification:", result)
+            print(
+                "Unexpected Claude classification:",
+                result,
+            )
+
             return "reply"
 
-    raise RuntimeError("Claude did not return a text response")
+    # Claude returned no text block.
+    # Don't crash the /chat endpoint.
+    print(
+        "Claude returned no text block.",
+        "Content:",
+        response.content,
+    )
+
+    return "reply"
