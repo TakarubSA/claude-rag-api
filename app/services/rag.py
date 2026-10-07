@@ -15,7 +15,7 @@ def answer_question(question: str, client_id: int):
     results = search_knowledge(
         query_embedding,
         client_id=client_id,
-        limit=3,
+        limit=8,
     )
 
     for result in results:
