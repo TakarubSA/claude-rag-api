@@ -18,6 +18,7 @@ def answer_question(question: str, client_id: int):
         limit=8,
     )
 
+    # Debug: show retrieved knowledge
     for result in results:
         print("ID:", result.id)
         print("DISTANCE:", result.distance)
@@ -30,24 +31,25 @@ def answer_question(question: str, client_id: int):
         for result in results
     )
 
-    # 4. Check if the retrieved context can actually answer the question
+    # Debug: show complete context
+    print("\n========== RETRIEVED CONTEXT ==========")
+    print(context)
+    print("========================================\n")
+
+    # 4. Check if the retrieved context can answer the question
     relevance = check_context_relevance(
         question=question,
         context=context,
     )
 
     print("CONTEXT RELEVANCE:", relevance)
-    answer = generate_answer(
-            question,
-            context,
-        )
 
     # 5. If the context is enough, generate the answer
     if relevance == "ANSWERABLE":
-        # answer = generate_answer(
-        #     question,
-        #     context,
-        # )
+        answer = generate_answer(
+            question=question,
+            context=context,
+        )
 
         best_distance = results[0].distance if results else None
 
@@ -57,7 +59,7 @@ def answer_question(question: str, client_id: int):
             "status": "KNOWN",
         }
 
-    # 6. The context was not enough to answer the question
+    # 6. Context was not enough to answer the question
     gap_type = classify_knowledge_gap(
         question=question,
         context=context,
@@ -65,8 +67,10 @@ def answer_question(question: str, client_id: int):
 
     print("KNOWLEDGE GAP:", gap_type)
 
+    best_distance = results[0].distance if results else None
+
     return {
-        "answer":answer,
-        "best_distance": results[0].distance if results else None,
+        "answer": "عذرًا، لا تتوفر لدي معلومات كافية للإجابة على هذا السؤال حاليًا.",
+        "best_distance": best_distance,
         "status": gap_type,
     }
