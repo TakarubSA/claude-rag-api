@@ -35,7 +35,7 @@ def insert_knowledge(
 def search_knowledge(
     query_embedding: list[float],
     client_id: int,
-    limit: int = 3,
+    limit: int = 8,
 ):
 
 
