@@ -42,6 +42,7 @@ User question:
 
     raise RuntimeError("Claude did not return a text response")
 
+
 def check_context_relevance(
     question: str,
     context: str,
@@ -85,27 +86,79 @@ User question:
 
     return "NOT_ANSWERABLE"
 
+
 def classify_knowledge_gap(
     question: str,
     context: str,
 ):
     prompt = f"""
-Determine whether the user's question is related to the subject,
-services, or domain described by the provided context.
-
-Return ONLY one of these two values:
+Classify the user's question into exactly one of these two categories:
 
 RELATED_BUT_UNKNOWN
 OUT_OF_SCOPE
 
 RELATED_BUT_UNKNOWN means:
-The question is related to the subject or services described
-in the context, but the context does not contain enough
-information to answer it.
+The user's question is about the same company, service, product,
+topic, or domain represented by the context, but the context does
+not contain enough information to answer the question completely.
+
+Important:
+If the context contains information about the company, service,
+or domain mentioned in the question, consider the question
+RELATED_BUT_UNKNOWN even if the specific information requested
+is missing.
+
+For example:
+
+Context:
+The company provides healthcare services.
+
+Question:
+Where is the company located?
+
+Result:
+RELATED_BUT_UNKNOWN
+
+Another example:
+
+Context:
+The company provides healthcare services.
+
+Question:
+What doctors are available today?
+
+Result:
+RELATED_BUT_UNKNOWN
 
 OUT_OF_SCOPE means:
-The question is unrelated to the subject, services, or domain
-described in the context.
+The user's question is clearly unrelated to the company,
+services, products, or domain represented by the context.
+
+For example:
+
+Context:
+The company provides healthcare services.
+
+Question:
+How many ants are there in the world?
+
+Result:
+OUT_OF_SCOPE
+
+Important rules:
+- Do not classify a question as OUT_OF_SCOPE simply because
+  the exact answer is missing from the context.
+- If the question mentions or asks about the company, its services,
+  products, doctors, locations, prices, appointments, or related
+  business information, it should normally be RELATED_BUT_UNKNOWN
+  when the context does not provide the answer.
+- OUT_OF_SCOPE should only be used when the question is clearly
+  unrelated to the company's domain.
+
+Return ONLY one of:
+
+RELATED_BUT_UNKNOWN
+OUT_OF_SCOPE
 
 Context:
 {context}
