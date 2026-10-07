@@ -9,7 +9,7 @@ router = APIRouter()
 
 @router.post("/knowledge/upload")
 async def upload_knowledge(
-    document: list = Body(...),
+    document: dict = Body(...),
     authorization: str | None = Header(default=None),
 ):
     if authorization is None:
