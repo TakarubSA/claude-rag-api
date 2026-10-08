@@ -88,7 +88,23 @@ def _rerank(query: str, results):
         return results
 
 
-def answer_question(question: str, client_id: int):
+def answer_question(
+    question: str,
+    client_id: int,
+    client_config: dict | None = None,
+):
+    print(
+        "CLIENT CONFIG LOADED:",
+        bool(client_config),
+    )
+
+    cleaned_question = _clean_text(question)
+
+    # 1. Understand the message (typo fixing + casual detection)
+    search_query = rewrite_query(question)
+
+    print("ORIGINAL QUERY:", question)
+    print("SEARCH QUERY:", search_query)
     cleaned_question = _clean_text(question)
 
     # 1. Understand the message (typo fixing + casual detection)

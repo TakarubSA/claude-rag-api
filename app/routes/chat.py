@@ -61,6 +61,8 @@ def chat(
     result = answer_question(
         question=request.message,
         client_id=client.id,
+        client_config=client.ai_config
+        
     )
 
     # 6. Save knowledge gaps

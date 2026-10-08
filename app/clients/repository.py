@@ -5,7 +5,10 @@ from app.database.connection import engine
 
 def get_client_by_token(token: str):
     query = text("""
-        SELECT id, name
+        SELECT
+            id,
+            name,
+            ai_config
         FROM clients
         WHERE token = :token
     """)
@@ -20,7 +23,6 @@ def get_client_by_token(token: str):
 
         client = result.fetchone()
 
-        print("TOKEN RECEIVED:", repr(token))
         print("CLIENT FOUND:", client)
 
         return client
