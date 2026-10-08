@@ -885,8 +885,14 @@ def check_context_relevance(
     client_config: dict | None = None,
 ):
     """
-    Determine whether retrieved context can contribute to a useful
-    answer for the current client.
+    Determine whether the system has enough reliable information
+    to provide a useful answer.
+
+    Sources of truth:
+    1. Retrieved knowledge
+    2. Client configuration
+
+    The function does NOT generate an answer.
     """
 
     config = _normalize_client_config(
@@ -898,14 +904,33 @@ def check_context_relevance(
     )
 
     prompt = f"""
-You are a context-relevance evaluator for a multi-tenant
-customer-support RAG system.
+You are an evidence evaluator in a multi-tenant RAG system.
 
-CLIENT PROFILE:
-{client_profile}
+Your job is to determine whether the system has enough reliable
+information to answer the user's question.
 
-Your only task is to determine whether the retrieved context
-contains useful information for answering the user's question.
+You have TWO valid sources of information:
+
+SOURCE A — RETRIEVED KNOWLEDGE
+This contains dynamic information retrieved from the client's
+knowledge base.
+
+SOURCE B — CLIENT CONFIGURATION
+This contains stable information explicitly configured for this
+client, such as:
+- company identity
+- official website
+- business description
+- stable business rules
+- workflow rules
+- safety rules
+- response rules
+
+Both sources are trusted.
+
+==================================================
+DECISION
+==================================================
 
 Return ONLY:
 
@@ -919,84 +944,131 @@ NOT_ANSWERABLE
 ANSWERABLE
 ==================================================
 
-Return ANSWERABLE when the context contains:
+Return ANSWERABLE when either source contains information
+that can contribute to a correct user-facing answer.
 
-- the direct answer
-- enough information for a useful partial answer
-- a relevant person/entity
-- relevant product/service information
-- a relevant price
-- a relevant procedure
-- a relevant policy
-- a relevant URL
-- a relevant contact detail
-- relevant instructions
-- relevant information that allows the user to be directed
-  to the correct configured workflow/service
+Examples:
 
-The context does NOT need to contain every possible detail.
+- The context directly answers the question.
+- The context contains a useful partial answer.
+- The context contains a relevant URL.
+- The context contains relevant prices.
+- The context contains relevant entities.
+- The client configuration contains the official website
+  and the user asks for the website.
+- The client configuration contains a stable business rule
+  directly relevant to the question.
+- The combination of client configuration + retrieved
+  knowledge allows a useful grounded answer.
+
+The answer does NOT need to contain every possible detail.
 
 ==================================================
 NOT_ANSWERABLE
 ==================================================
 
-Return NOT_ANSWERABLE only when the context contains
-no useful information for the user's question.
+Return NOT_ANSWERABLE only when neither the retrieved knowledge
+nor the client configuration contains useful information for
+the question.
 
-Do NOT require an exact textual match.
+Do not reject an answer simply because:
 
-Understand:
-
-- typos
-- dialect
-- synonyms
-- paraphrasing
-- Arabic/English equivalents
-- abbreviations
-
-A context entry can be useful even if it uses different wording
-from the user's question.
+- wording is different
+- the user has spelling mistakes
+- the user uses dialect
+- the answer is distributed across multiple entries
+- the knowledge contains extra irrelevant entries
 
 ==================================================
-IMPORTANT
+IMPORTANT EVIDENCE RULE
 ==================================================
 
-The client's profile helps determine the business/domain.
+Do not judge based on whether the entire context looks relevant.
 
-It must NOT be used to invent the actual answer.
+Look for ANY specific evidence that can answer the question.
 
-Evaluate whether the CONTEXT is useful.
+For example:
+
+Question:
+كيف طرق الدفع
+
+Context:
+- مدى
+- Visa
+- Mastercard
+- Apple Pay
+
+Correct result:
+ANSWERABLE
+
+Question:
+وين موقعكم
+
+Client configuration:
+Official website:
+https://example.com
+
+Correct result:
+ANSWERABLE
+
+Question:
+كم سعر المنتج X
+
+Context:
+No information about product X.
+
+Client configuration:
+No price for product X.
+
+Correct result:
+NOT_ANSWERABLE
 
 ==================================================
-CONTEXT
+CLIENT CONFIGURATION
+==================================================
+
+{client_profile}
+
+==================================================
+RETRIEVED KNOWLEDGE
 ==================================================
 
 {context}
 
 ==================================================
-QUESTION
+USER QUESTION
 ==================================================
 
 {question}
+
+==================================================
+OUTPUT
+==================================================
+
+Return ONLY:
+ANSWERABLE
+or
+NOT_ANSWERABLE
 """
 
     result = _call_claude(
         prompt,
-        max_tokens=30,
+        max_tokens=100,
     )
 
     if result:
         result = result.strip().upper()
 
-        if result in {
-            "ANSWERABLE",
-            "NOT_ANSWERABLE",
-        }:
-            return result
+        # Be tolerant if Claude adds whitespace/newlines.
+        first_line = result.splitlines()[0].strip()
+
+        if first_line == "ANSWERABLE":
+            return "ANSWERABLE"
+
+        if first_line == "NOT_ANSWERABLE":
+            return "NOT_ANSWERABLE"
 
     return "NOT_ANSWERABLE"
-
-
 # ----------------------------------------------------------------------
 # 5) Knowledge-gap classification
 # ----------------------------------------------------------------------
