@@ -4,16 +4,16 @@ import re
 import anthropic
 from dotenv import load_dotenv
 
-
 load_dotenv()
-
 
 client = anthropic.Anthropic(
     api_key=os.getenv("ANTHROPIC_API_KEY")
 )
 
-MODEL = "claude-sonnet-5-5"
-WEBSITE_URL = "https://hakeemcare.com/"
+# MODEL = "claude-sonnet-5-5"
+MODEL = "claude-haiku-4-5-20251001"
+
+CASUAL_MARKER = "__CASUAL_CONVERSATION__"
 
 
 # ----------------------------------------------------------------------
@@ -22,7 +22,7 @@ WEBSITE_URL = "https://hakeemcare.com/"
 
 def _extract_text(response):
     """
-    Extract the first text block from a Claude response.
+    Extract the first actual text block from a Claude response.
     Ignores thinking/tool blocks.
     """
     for block in response.content:
@@ -34,25 +34,35 @@ def _extract_text(response):
 
 def _call_claude(prompt: str, max_tokens: int):
     """
-    Single place for all Claude calls.
-    Returns text or None (never raises), so the pipeline never crashes.
+    Single Claude call helper.
+
+    Returns text or None.
+    Never raises into the RAG pipeline.
     """
-    # The model may spend the whole max_tokens budget on a thinking block and
-    # return no text (seen in production logs with tiny budgets like 20-30).
-    # If that happens, retry once with a much larger budget.
     for attempt in range(2):
-        budget = max_tokens if attempt == 0 else max(max_tokens, 1024) + 1500
+        budget = (
+            max_tokens
+            if attempt == 0
+            else max(max_tokens, 1024) + 1500
+        )
+
         try:
             response = client.messages.create(
                 model=MODEL,
                 max_tokens=budget,
-                messages=[{"role": "user", "content": prompt}],
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt,
+                    }
+                ],
             )
         except Exception as e:
             print(f"[claude_service] API error: {e}")
             return None
 
         text = _extract_text(response)
+
         if text:
             return text
 
@@ -70,257 +80,305 @@ def _is_arabic(text: str) -> bool:
 
 def _light_clean(text: str) -> str:
     """
-    Light cleanup before sending to the LLM:
-    - remove diacritics and tatweel
-    - collapse letters repeated 3+ times (هلاااا -> هلاا)
-    - collapse whitespace
+    Light normalization for user input.
     """
     text = (text or "").strip()
+
+    # Arabic diacritics + tatweel
     text = re.sub(r"[\u064B-\u0652\u0640]", "", text)
+
+    # هلااااا -> هلاا
     text = re.sub(r"(.)\1{2,}", r"\1\1", text)
+
+    # Collapse whitespace
     text = re.sub(r"\s+", " ", text)
+
     return text
 
 
 # ----------------------------------------------------------------------
-# 1) Query rewriting (typo tolerant)
+# 1) Generic query rewriting
 # ----------------------------------------------------------------------
 
 def rewrite_query(question: str) -> str:
     """
-    Rewrite a user question for better retrieval.
+    Convert a user's message into a retrieval-friendly search query.
+
+    This function is completely domain-agnostic.
+    It does not assume healthcare, products, doctors, or any industry.
 
     Returns:
-        - A rewritten search query
-        - "__CASUAL_CONVERSATION__" for simple social messages
+        SEARCH_QUERY text
+        OR
+        __CASUAL_CONVERSATION__
     """
 
     cleaned = _light_clean(question)
 
     prompt = f"""
-You are a query understanding and rewriting component for a Hakeem Care
-RAG system. Hakeem Care is a Saudi telehealth company (online doctor
-consultations, labs, home visits, prescriptions, Ask a Doctor, etc.).
+You are a generic query-understanding and search-query rewriting component
+for a multi-tenant knowledge assistant.
 
-Decide whether the user's message is:
+The assistant serves many different businesses and industries.
 
-1. A REAL INFORMATION / SERVICE QUERY
-2. A CASUAL CONVERSATIONAL MESSAGE
+Your job is ONLY to understand the user's message and rewrite it into a
+better search query for a knowledge base.
 
-Return ONLY ONE of the following:
+The user's message may be:
+- Arabic
+- English
+- Saudi/Gulf/Egyptian/Levantine dialect
+- typed with spelling mistakes
+- missing letters
+- containing Arabizi
+- containing merged words
+- very short or informal
 
-SEARCH_QUERY: <rewritten query>
+You must infer the intended meaning from the user's wording.
 
-or
+==================================================
+STEP 1 — CASUAL CONVERSATION
+==================================================
+
+Return:
 
 CASUAL_CONVERSATION
 
-==================================================
-TYPO & DIALECT TOLERANCE (VERY IMPORTANT)
-==================================================
-
-Users write fast on phones. Their messages often contain:
-- Missing, extra, swapped, or wrong letters
-  (موقكم = موقعكم, رقمكن = رقمكم, ايميلكن = ايميلكم,
-   حجز = حجزز, دكتر = دكتور, تحاليل = تحليل, اسعارم = اسعاركم)
-- Wrong ending letters (ن instead of م, ه instead of ة, etc.)
-- Missing spaces or merged words (كمسعر = كم سعر)
-- Gulf / Saudi / Egyptian / Levantine dialect words
-- English words written in Arabic letters, or Arabizi
-
-You MUST infer the intended word from context and meaning, even if
-1-2 letters are wrong. NEVER fail or return an empty result because
-of a spelling mistake. Always fix the typo silently and write the
-query in clear, correct Arabic.
-
-Examples with typos:
-
-User: وين موقكم
-Result: SEARCH_QUERY: ما هو موقع حكيم كير؟
-
-User: رقمكن كم
-Result: SEARCH_QUERY: ما هو رقم التواصل؟
-
-User: ايميلكن
-Result: SEARCH_QUERY: ما هو البريد الإلكتروني لحكيم كير؟
-
-User: ابغا احجز دكتر
-Result: SEARCH_QUERY: أرغب في حجز موعد مع طبيب.
-
-User: كمسعر تحليل فتامين د
-Result: SEARCH_QUERY: كم سعر تحليل فيتامين د؟
-
-User: عندكم دكتور جلديه؟
-Result: SEARCH_QUERY: هل تتوفر استشارة في تخصص الجلدية؟
-
-User: شلون اسال دكتر
-Result: SEARCH_QUERY: كيف يمكن استخدام خدمة اسأل طبيب؟
-
-==================================================
-CASUAL CONVERSATION
-==================================================
-
-Use CASUAL_CONVERSATION only when the user is simply being social,
-friendly, polite, or chatting, and is NOT asking for any information
-or action about Hakeem Care, healthcare, services, doctors, prices,
-appointments, labs, prescriptions, payments, or locations.
-
-Examples (including dialect variations and typos):
-
-كيفك؟ / كيف حالك / كيف اخبارك / شخبارك / وش اخبارك / كيفك يا غالي
-ايش مسوي / وش تسوي / وش عندك / شو الاخبار / وش علومك
-هلا / هلا والله / يا هلا والله / مرحبا / اهلين / hi / hello
-صباح الخير / مساء الخير / السلام عليكم / سلام
-يعطيكم العافية / الله يعافيك / شكرا / مشكور / تسلم / thanks
-الحمدلله / تمام / طيب / اوكي / باي / مع السلامة
-
-Result for all of the above: CASUAL_CONVERSATION
-
-IMPORTANT:
-- If the message contains an actual request or question about a
-  service, it is NOT casual, even if it starts with a greeting.
-- If you are unsure, choose SEARCH_QUERY (never CASUAL_CONVERSATION).
+ONLY when the user is clearly being social and is NOT requesting
+information, an action, a product, a service, a policy, a price,
+a person, a location, a procedure, or any business-related information.
 
 Examples:
 
-User: كيف احجز دكتور؟
-Result: SEARCH_QUERY: كيف يمكن حجز موعد مع طبيب؟
+كيفك؟
+كيف حالك؟
+كيف اخبارك؟
+شخبارك؟
+ايش مسوي؟
+وش تسوي؟
+هلا
+هلا والله
+مرحبا
+اهلين
+شكرا
+مشكور
+يعطيكم العافية
+الله يعافيك
+thanks
+hi
+hello
+باي
+مع السلامة
 
-User: كيف أعرف أسعاركم؟
-Result: SEARCH_QUERY: ما هي أسعار الخدمات؟
+If there is an actual request or question, it is NOT casual.
 
-User: كيف حال الطبيب؟
-Result: SEARCH_QUERY: كيف هي حالة الطبيب؟
+Examples:
 
-User: السلام عليكم، ابغى دكتور جلدية
-Result: SEARCH_QUERY: أريد حجز استشارة في تخصص الجلدية.
+السلام عليكم، ابغى دكتور
+السلام عليكم، ابغى سعر المنتج
+هلا، وين موقعكم؟
+شكراً، بس كم السعر؟
+
+These are SEARCH_QUERY.
 
 ==================================================
-SEARCH QUERY RULES
+STEP 2 — SEARCH QUERY
 ==================================================
 
-- Preserve the exact meaning and intent.
-- Convert colloquial Arabic into clear Arabic and fix spelling.
-- Do not add facts that were not mentioned.
-- Do not invent services, doctors, prices, locations, or entities.
-- Keep important names, services, specialties, products, entities.
-- Do not make the query more specific than the original.
-- Keep the user's own key words. Only fix spelling and dialect. If a
-  phrase is ambiguous, keep it ambiguous. Do NOT choose one meaning.
-  User: كيف اعرف مواعيد الادويه
-  Result: SEARCH_QUERY: كيف أعرف مواعيد الأدوية؟
-  (NOT: "مواعيد تناول الأدوية" and NOT "مواعيد توصيل الأدوية")
-  User: مين انتم
-  Result: SEARCH_QUERY: من هي حكيم كير وما هي خدماتها؟
-- Make short ambiguous questions clearer only when the intent is obvious.
-- If the user describes symptoms or asks about medication, keep the
-  question as is (do not answer it), e.g.
-  User: عندي صداع ايش اخذ
-  Result: SEARCH_QUERY: عندي صداع ما العلاج المناسب؟
-- Return one short search query.
-- Do NOT answer the user's question.
+Return:
 
-More examples:
+SEARCH_QUERY: <query>
 
-User: شو رقمكم
-Result: SEARCH_QUERY: ما هو رقم التواصل؟
+Rules:
 
-User: عندكم دكتور مسالك؟
-Result: SEARCH_QUERY: هل تتوفر استشارة في تخصص المسالك البولية؟
+1. Preserve the exact meaning of the user's message.
 
-User: ابغى احجز دكتور
-Result: SEARCH_QUERY: أرغب في حجز موعد مع طبيب.
+2. Correct spelling mistakes and dialect silently.
 
-User: كم سعر قراءة التحاليل؟
-Result: SEARCH_QUERY: كم سعر قراءة نتائج التحاليل؟
+3. Keep important nouns, names, products, services, categories,
+   organizations, people, locations, models, codes, and other entities.
 
-User: ما وصلني رابط الموعد
-Result: SEARCH_QUERY: لم يصلني رابط موعد الطبيب.
+4. Do NOT invent facts.
 
-User: وش الخدمات اللي عندكم؟
-Result: SEARCH_QUERY: ما هي الخدمات التي تقدمها حكيم كير؟
+5. Do NOT add a specific entity that the user did not mention.
 
-User: هل عندكم زيارة منزلية؟
-Result: SEARCH_QUERY: هل تتوفر خدمة الزيارة المنزلية؟
+6. Make the query retrieval-friendly.
 
-User: ابغى اعرف عن المختبر
-Result: SEARCH_QUERY: أرغب في معرفة معلومات عن خدمات المختبر.
+7. When the user uses a broad concept, preserve the important concept
+   and, when obvious from the wording, include natural equivalent terms.
 
-User question:
+   Example:
+   "مين الدكاتره عندكم؟"
+   can become:
+   "الأطباء الدكاترة المتاحون"
+
+   Example:
+   "ايش المحركات البحرية عندكم؟"
+   can become:
+   "المحركات البحرية المتوفرة"
+
+8. Do NOT add a business name unless the user explicitly provided it.
+
+9. Do NOT answer the user's question.
+
+10. Return only one short search query.
+
+11. Do not turn an ambiguous question into a more specific question.
+
+12. Preserve product names and proper nouns exactly when possible.
+
+==================================================
+TYPO / DIALECT EXAMPLES
+==================================================
+
+User:
+وين موقكم
+
+Result:
+SEARCH_QUERY: وين موقعكم؟
+
+User:
+رقمكن كم
+
+Result:
+SEARCH_QUERY: كم رقم التواصل؟
+
+User:
+ابغا احجز دكتر
+
+Result:
+SEARCH_QUERY: أريد حجز موعد مع طبيب
+
+User:
+كم سعره
+
+Result:
+SEARCH_QUERY: كم سعره؟
+
+User:
+ايش الاشياء المتوفره
+
+Result:
+SEARCH_QUERY: ما الأشياء المتوفرة؟
+
+User:
+مين الدكاتره عندكم؟
+
+Result:
+SEARCH_QUERY: الأطباء الدكاترة المتاحون
+
+User:
+ايش المنتجات الي عندكم؟
+
+Result:
+SEARCH_QUERY: المنتجات المتوفرة
+
+User:
+عندكم قطع غيار للمحرك؟
+
+Result:
+SEARCH_QUERY: قطع غيار المحرك المتوفرة
+
+==================================================
+IMPORTANT
+==================================================
+
+If the user asks about a specific domain, preserve that domain from the
+user's own words.
+
+Do not assume what the business sells.
+
+Do not assume the customer is asking about healthcare.
+
+Do not assume the customer is asking about products.
+
+Do not assume the customer is asking about people.
+
+Do not assume the customer is asking about a location.
+
+User message:
+
 {cleaned}
 """
 
-    result = _call_claude(prompt, max_tokens=150)
+    result = _call_claude(prompt, max_tokens=180)
 
     if not result:
-        # Safe fallback: retrieve using the cleaned original question.
         return cleaned or question
 
     result = result.strip()
 
     if result.upper().startswith("CASUAL_CONVERSATION"):
-        return "__CASUAL_CONVERSATION__"
+        return CASUAL_MARKER
 
-    if result.startswith("SEARCH_QUERY:"):
-        result = result[len("SEARCH_QUERY:"):].strip()
+    if result.upper().startswith("SEARCH_QUERY:"):
+        result = result.split(":", 1)[1].strip()
 
     return result or cleaned or question
 
 
 # ----------------------------------------------------------------------
-# 2) Casual conversation
+# 2) Generic casual conversation
 # ----------------------------------------------------------------------
 
 def generate_casual_answer(question: str):
     """
-    Answer simple conversational messages directly.
-    No knowledge retrieval is required.
+    Handles simple social messages without retrieval.
     """
 
     prompt = f"""
-You are a friendly and natural customer support assistant for Hakeem Care
-(a Saudi telehealth company).
+You are a friendly customer-support assistant.
 
-The user's message is casual conversation only (greetings, how are you,
-what are you doing, thanks, goodbye, etc.). Messages may contain typos
-or dialect: understand the intent anyway.
+The user's message is casual conversation only.
 
-Respond naturally and briefly (1-2 short sentences).
+Respond naturally and briefly in 1-2 short sentences.
 
 Rules:
-- Use the same language and dialect style as the user (Saudi/Gulf
-  Arabic if they write Gulf Arabic).
-- Match the user's tone. Be warm and polite.
-- You may say you are the Hakeem Care assistant and are doing well,
-  if asked how you are or what you are doing.
-- Do not invent Hakeem Care information, prices, or services.
-- Do not give any medical advice.
-- Do not mention RAG, context, knowledge base, embeddings, or retrieval.
-- Do not turn a casual message into a business answer.
-- Naturally invite the user to ask about Hakeem Care services.
+- Use the same language as the user.
+- Match the user's tone.
+- Be warm and natural.
+- Do not invent business information.
+- Do not provide domain-specific information.
+- Do not mention RAG, context, embeddings, knowledge base, or retrieval.
+- Do not turn casual conversation into a business answer.
 
 Examples:
 
-User: كيفك؟
-Response: بخير الحمد لله 🌷 كيف أقدر أساعدك؟
+User:
+كيفك؟
 
-User: ايش مسوي؟
-Response: الحمد لله تمام 🌷 جاهز أساعدك بأي شي تحتاجه من خدمات حكيم كير.
+Response:
+بخير الحمد لله 🌷 كيف أقدر أساعدك؟
 
-User: كيف اخبارك؟
-Response: بخير ولله الحمد 🌷 وأنت كيفك؟
+User:
+كيف اخبارك؟
 
-User: يعطيكم العافية
-Response: الله يعافيك 🌷 حياك الله.
+Response:
+بخير ولله الحمد 🌷 وأنت كيفك؟
 
-User: شكراً
-Response: العفو، حياك الله 🌷
+User:
+يعطيكم العافية
 
-User: السلام عليكم
-Response: وعليكم السلام ورحمة الله وبركاته 🌷 حياك الله.
+Response:
+الله يعافيك 🌷 حياك الله.
 
-User: hi
-Response: Hello 🌷 How can I help you today?
+User:
+شكراً
+
+Response:
+العفو، حياك الله 🌷
+
+User:
+السلام عليكم
+
+Response:
+وعليكم السلام ورحمة الله وبركاته 🌷 حياك الله.
+
+User:
+hi
+
+Response:
+Hello 🌷 How can I help you?
 
 User:
 {_light_clean(question)}
@@ -335,161 +393,88 @@ User:
 
 
 # ----------------------------------------------------------------------
-# 3) Grounded answer
+# 3) Generic grounded answer
 # ----------------------------------------------------------------------
 
 def generate_answer(question: str, context: str):
+    """
+    Generate an answer using ONLY the retrieved knowledge.
+
+    No hardcoded business/domain rules.
+    """
+
     prompt = f"""
-You are a helpful customer support assistant for Hakeem Care.
+You are a helpful customer-support assistant for a business.
 
-Your job is to answer the user's question using ONLY the information
-provided in the context and the business rules below.
+Answer the user's question using ONLY the information provided
+in the context.
 
-The user's message may contain spelling mistakes or dialect (for example
-"موقكم" meaning "موقعكم", or "رقمكن" meaning "رقمكم"). Understand the
-intended meaning and answer normally. Never mention the typo.
-
-==================================================
-STRICT GROUNDING RULES (MOST IMPORTANT)
-==================================================
-
-- Every fact in your answer (prices, doctors, phone numbers, emails,
-  policies, procedures, links) must come from the context or from the
-  business rules below.
-- NEVER give medical advice, diagnosis, medication names, doses, or
-  treatment suggestions, even if the user asks directly or describes
-  symptoms. You are not a doctor. Instead:
-    * Politely say you cannot give medical advice.
-    * Point the user to the right Hakeem Care service:
-      urgent consultation (15 SAR), booking a specific specialty
-      online, or "Ask a Doctor" (free, app only).
-- NEVER guess or fill gaps from your own knowledge.
-- If the context does NOT contain the answer (or only part of it):
-    * Share only what is confirmed in the context.
-    * Clearly say the rest is not available to you right now.
-    * Tell the user to check the Hakeem Care website for the most
-      accurate information: {WEBSITE_URL}
-- Always include {WEBSITE_URL} when you cannot fully answer.
-
-- MEDICATION QUESTIONS (how/when to take a drug, interactions, side
-  effects): do NOT answer them yourself. If the context mentions the
-  free pharmacist consultation, direct the user to it. Otherwise
-  direct them to Ask a Doctor / a doctor consultation.
-- If a question is ambiguous (e.g. "مواعيد الأدوية" could mean when to
-  take a medicine, or a prescription/delivery status), do not ask
-  back. Briefly cover the possible meanings using only the context
-  (pharmacist consultation for usage, order tracking for delivery).
-- If the context has several website URLs, always use {WEBSITE_URL}
-  as the official website. Ignore shortened or tracking links.
-- If the context mentions a link only by name (e.g. "رابط مواعيد
-  الصحة النفسية") without a real URL, do NOT present it as a link.
-  Say where to find it (app/website) and give {WEBSITE_URL}.
-- If a knowledge entry ends with a question to the user, turn it into
-  a statement or drop it. Do not ask the user questions.
-- Ignore irrelevant parts of the context (other services, headings
-  such as "Order Tracking", lists of example questions).
+The business/domain is determined entirely by the context.
+Never assume what the business sells or does.
 
 ==================================================
-BUSINESS CONTEXT
+STRICT GROUNDING RULES
 ==================================================
 
-Hakeem Care provides remote telehealth consultations.
+1. Every factual statement must be supported by the context.
 
-For telehealth appointments, patients do NOT need to visit a medical
-center. A patient can book a doctor remotely and attend the
-consultation online.
+2. NEVER invent:
+- prices
+- products
+- services
+- people
+- names
+- availability
+- policies
+- locations
+- dates
+- phone numbers
+- emails
+- URLs
+- procedures
+- specifications
 
-Do NOT assume that a patient needs to visit a branch or medical center
-when asking about booking a doctor or a medical consultation.
+3. If the context contains only part of the answer:
+- provide the confirmed information
+- clearly say that the remaining information is not available
 
-Do NOT ask the patient for their city or location when the request is
-about booking a doctor or a remote telehealth consultation.
+4. Do not use external knowledge to fill gaps.
 
-Physical locations are only relevant when the question is specifically
-about a physical service, such as:
-- Laboratory branches
-- Home visit coverage
-- Pharmacy pickup
-- Another service that actually requires a physical location
+5. Use the user's language.
 
-==================================================
-SERVICE RULES
-==================================================
+6. Understand dialect and spelling mistakes naturally.
 
-1. URGENT CONSULTATION
-An urgent consultation is available through the Hakeem Care
-application or website for 15 SAR.
+7. Keep the response concise and direct.
 
-2. SPECIFIC DOCTOR OR SPECIALTY
-When the user asks for a doctor in a specific specialty:
-- Explain how to book the online consultation.
-- Tell the user to open the Hakeem Care application or website.
-- Select Online Consultations.
-- Select the requested specialty.
-- Select the available doctor.
-- Select the suitable appointment.
-- Complete the booking.
-If the context contains a specific doctor, price, or available
-appointment times, include those details.
-Do NOT invent doctor names, prices, or appointment times.
-A specific online consultation does NOT require asking for the
-user's city.
+8. Do not mention:
+- RAG
+- embeddings
+- vector search
+- retrieval
+- context
+- knowledge base
+- AI system
 
-3. LAB RESULT INTERPRETATION
-Reading or interpreting laboratory results costs 15 SAR.
-Do not confuse laboratory result interpretation with the price of
-a laboratory test itself.
+9. Do not ask follow-up questions unless absolutely necessary for
+the answer. Prefer giving the confirmed information available.
 
-4. ASK A DOCTOR
-"Ask a Doctor" is a free service available through the Hakeem Care
-application only. It is a chat-based consultation with a doctor and
-does NOT include a medical prescription.
+10. If a relevant URL appears in the context, preserve it exactly.
 
-5. SERVICE PRICES
-When the user asks about prices:
-- Use the actual prices available in the context.
-- If multiple specific tests or packages are available, list them
-  clearly.
-- Do not invent a general price when only specific test/package prices
-  are available.
-- If the information is partial, explain that prices vary by test or
-  package, give the prices that are available, and refer the user to
-  {WEBSITE_URL} for the full list.
+11. If the context contains several unrelated entries, ignore them.
+
+12. Do not copy irrelevant sections from the context.
+
+13. Never turn a statement in the knowledge into a question to the user.
 
 ==================================================
-LINK RULES
+CONTEXT
 ==================================================
-
-- Inspect the entire context for URLs.
-- If a URL is relevant to the user's question, include it.
-- If the user asks for the website, provide the website URL found in
-  the context (or {WEBSITE_URL}).
-- If the user asks how to book and a relevant booking URL exists,
-  provide it.
-- If a direct service URL exists, prefer it over a general URL.
-- Never invent a URL. Never modify a URL.
-- Copy URLs exactly as they appear in the context.
-- Do not omit a relevant URL just because it appears in a different
-  knowledge entry.
-
-==================================================
-GENERAL RULES
-==================================================
-
-- Answer the user's question directly and concisely.
-- Do NOT ask follow-up or clarification questions.
-- Do NOT ask for the user's city for general telehealth booking.
-- If the context contains useful partial information, use it.
-- Clearly distinguish between confirmed and unavailable information.
-- Use the same language as the user (Arabic -> Arabic, English -> English).
-- Do not mention the knowledge base, context, embeddings, retrieval,
-  RAG, or AI system.
-
-Context:
 
 {context}
 
-User question:
+==================================================
+USER QUESTION
+==================================================
 
 {question}
 """
@@ -499,73 +484,75 @@ User question:
     if result:
         return result
 
-    return generate_fallback_answer(question, "RELATED_BUT_UNKNOWN")
+    return generate_fallback_answer(
+        question,
+        "RELATED_BUT_UNKNOWN",
+    )
 
 
 # ----------------------------------------------------------------------
-# 4) Relevance check
+# 4) Generic relevance check
 # ----------------------------------------------------------------------
 
 def check_context_relevance(
     question: str,
     context: str,
 ):
+    """
+    Decide whether the retrieved context contains useful information
+    for answering the user's question.
+
+    Completely domain-agnostic.
+    """
+
     prompt = f"""
 Determine whether the provided context contains useful information
-that can be used to answer the user's question.
+that can answer the user's question.
 
-The question may contain spelling mistakes or dialect (e.g. "موقكم" =
-"موقعكم", "رقمكن" = "رقمكم"). Judge by the intended meaning.
+The business/domain is unknown to you except for what can be inferred
+from the context.
 
-Return ONLY one of these two values:
+The question may contain:
+- spelling mistakes
+- dialect
+- short wording
+- informal wording
+
+Understand the intended meaning.
+
+Return ONLY one:
 
 ANSWERABLE
+
+or
+
 NOT_ANSWERABLE
 
-ANSWERABLE does NOT require the context to contain every possible
-detail.
-
 Return ANSWERABLE when the context contains:
-- The direct answer to the question, OR
-- Relevant information that allows a useful partial answer, OR
-- A relevant URL or website address, OR
-- Relevant prices or service information, OR
-- Relevant booking instructions, doctor information, or appointment
-  information.
+- the direct answer
+- a useful partial answer
+- a relevant product/service/person/category
+- a relevant price
+- a relevant location
+- a relevant procedure
+- a relevant URL
+- other information that directly helps answer the question
 
-Return NOT_ANSWERABLE ONLY when the context contains no useful
-information for the user's question.
+Return NOT_ANSWERABLE when the context contains no useful information
+for the user's question.
 
-IMPORTANT BUSINESS CONTEXT:
+Do not assume a connection just because the context and question share
+generic words.
 
-Hakeem Care provides remote telehealth consultations.
-Patients can book doctors remotely and attend consultations online.
-Do not mark a telehealth booking question as NOT_ANSWERABLE simply
-because the user's city or location is unknown.
-
-IMPORTANT REDIRECT RULE:
-If the context lets us point the user to the RIGHT Hakeem Care service
-for their need (for example the free pharmacist consultation for
-questions about taking medication, Ask a Doctor, booking a
-consultation, prescription or order tracking), return ANSWERABLE.
-Directing the user to the correct service is a valid answer.
-For vague questions, if ANY entry in the context is relevant to one of
-the likely meanings, return ANSWERABLE.
-
-IMPORTANT URL RULE:
-If a relevant URL appears anywhere in the context, consider the
-question ANSWERABLE when that URL helps answer the user's request.
-
-IMPORTANT PRICE RULE:
-If the context contains specific prices that are relevant to the
-question, consider the question ANSWERABLE even if the context does
-not contain every possible test or package price.
-
-Context:
+==================================================
+CONTEXT
+==================================================
 
 {context}
 
-User question:
+==================================================
+USER QUESTION
+==================================================
 
 {question}
 """
@@ -582,69 +569,52 @@ User question:
 
 
 # ----------------------------------------------------------------------
-# 5) Knowledge gap classification
+# 5) Generic knowledge-gap classification
 # ----------------------------------------------------------------------
 
 def classify_knowledge_gap(
     question: str,
     context: str,
 ):
+    """
+    Generic classification for unanswered questions.
+    """
+
     prompt = f"""
-Classify the user's question into exactly one of these three categories:
+Classify the user's question using ONLY the question and the context.
+
+Return exactly one:
 
 RELATED_BUT_UNKNOWN
-MEDICAL_ADVICE
+
+or
+
 OUT_OF_SCOPE
 
 RELATED_BUT_UNKNOWN:
-The question is related to Hakeem Care, its services, products,
-doctors, consultations, laboratories, prescriptions, payments,
-appointments, contact details, or website, but the available context
-does not contain enough information to answer it.
-
-MEDICAL_ADVICE:
-The user describes symptoms, asks for a diagnosis, asks which
-medication/dose/treatment to take, or asks any personal medical
-question that requires a doctor's judgment.
+The question appears to be related to the business/domain represented
+by the available context, but the context does not contain enough
+information to answer it.
 
 OUT_OF_SCOPE:
-The question is clearly unrelated to Hakeem Care, its services, or
-the healthcare domain (e.g. sports, cooking, politics, general trivia).
+The question is clearly unrelated to the business/domain represented
+by the context.
 
-The question may contain spelling mistakes or dialect (e.g. "موقكم" =
-"موقعكم"). Judge by the intended meaning.
+Important:
+- Do not classify something as OUT_OF_SCOPE merely because the exact
+  answer is missing.
+- Spelling mistakes and dialect should be ignored.
+- Judge the user's intended meaning.
 
-Examples:
-
-Question: What doctors are available today?
-Result: RELATED_BUT_UNKNOWN
-
-Question: وين موقكم
-Result: RELATED_BUT_UNKNOWN
-
-Question: عندي صداع من يومين ايش اخذ؟
-Result: MEDICAL_ADVICE
-
-Question: How many ants are there in the world?
-Result: OUT_OF_SCOPE
-
-IMPORTANT BUSINESS CONTEXT:
-Hakeem Care provides remote telehealth consultations. A missing city
-or location does NOT make a telehealth question OUT_OF_SCOPE.
-Do not classify a question as OUT_OF_SCOPE simply because the exact
-answer is missing.
-
-Return ONLY one of:
-
-RELATED_BUT_UNKNOWN
-MEDICAL_ADVICE
-OUT_OF_SCOPE
-
-Context:
+==================================================
+CONTEXT
+==================================================
 
 {context}
 
-User question:
+==================================================
+USER QUESTION
+==================================================
 
 {question}
 """
@@ -654,63 +624,46 @@ User question:
     if result:
         result = result.strip().upper()
 
-        if result in {"RELATED_BUT_UNKNOWN", "MEDICAL_ADVICE", "OUT_OF_SCOPE"}:
+        if result in {
+            "RELATED_BUT_UNKNOWN",
+            "OUT_OF_SCOPE",
+        }:
             return result
 
-    # If we are unsure, treat it as related so the user is sent to the
-    # website instead of being told the question is out of scope.
     return "RELATED_BUT_UNKNOWN"
 
 
 # ----------------------------------------------------------------------
-# 6) Deterministic fallback (no LLM -> no hallucination)
+# 6) Generic deterministic fallback
 # ----------------------------------------------------------------------
 
-def generate_fallback_answer(question: str, gap_type: str = "RELATED_BUT_UNKNOWN") -> str:
+def generate_fallback_answer(
+    question: str,
+    gap_type: str = "RELATED_BUT_UNKNOWN",
+) -> str:
     """
-    Safe, fixed responses used when the knowledge base cannot answer.
-    Always points the user to the Hakeem Care website.
-    gap_type: RELATED_BUT_UNKNOWN | MEDICAL_ADVICE | OUT_OF_SCOPE
+    Safe fallback without any business-specific assumptions.
     """
 
     arabic = _is_arabic(question)
 
-    if gap_type == "MEDICAL_ADVICE":
-        if arabic:
-            return (
-                "عذرًا، ما أقدر أعطيك نصيحة طبية أو تشخيص 🌷\n"
-                "تقدر تستشير طبيب مباشرة من خلال تطبيق أو موقع حكيم كير:\n"
-                "- استشارة عاجلة بـ 15 ريال\n"
-                "- أو احجز موعد مع طبيب في التخصص المناسب\n"
-                f"{WEBSITE_URL}"
-            )
-        return (
-            "Sorry, I can't provide medical advice or a diagnosis 🌷\n"
-            "You can consult a doctor directly through the Hakeem Care app "
-            "or website (urgent consultation is 15 SAR):\n"
-            f"{WEBSITE_URL}"
-        )
-
     if gap_type == "OUT_OF_SCOPE":
         if arabic:
             return (
-                "أنا مساعد حكيم كير، وأقدر أساعدك في الأسئلة عن خدماتنا "
-                "(الاستشارات، الحجوزات، المختبر، الأسعار...) 🌷\n"
-                f"وللمزيد من المعلومات زر موقعنا: {WEBSITE_URL}"
+                "أقدر أساعدك في المعلومات المتعلقة بالخدمة أو الجهة "
+                "التي تتحدث معها 🌷"
             )
+
         return (
-            "I'm the Hakeem Care assistant and can help with questions about "
-            "our services (consultations, bookings, labs, prices...) 🌷\n"
-            f"For more information, visit: {WEBSITE_URL}"
+            "I can help with information related to the business or "
+            "service you are contacting 🌷"
         )
 
-    # RELATED_BUT_UNKNOWN
     if arabic:
         return (
-            "ما لقيت معلومة مؤكدة عن هذا السؤال حاليًا 🌷\n"
-            f"تقدر تتأكد من موقع حكيم كير للحصول على أدق المعلومات:\n{WEBSITE_URL}"
+            "ما لقيت معلومة مؤكدة عن هذا السؤال حاليًا 🌷"
         )
+
     return (
-        "I couldn't find confirmed information about this right now 🌷\n"
-        f"Please check the Hakeem Care website for the most accurate details:\n{WEBSITE_URL}"
+        "I couldn't find confirmed information about this right now 🌷"
     )
