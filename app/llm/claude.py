@@ -13,90 +13,128 @@ client = anthropic.Anthropic(
 
 
 def rewrite_query(question: str) -> str:
-    """
-    Rewrite the user's question into a clearer search query.
-
-    This function does NOT answer the user.
-    It only improves the query before embedding/retrieval.
-    """
-
     prompt = f"""
-You are a query rewriting assistant for Hakeem Care.
+You are a query rewriting component for a Hakeem Care RAG system.
 
-Your job is ONLY to rewrite the user's question into a clear search query
-for knowledge retrieval.
+Your ONLY task is to rewrite the user's message into a clear,
+concise search query that preserves the exact meaning and intent
+of the original message.
 
-Do NOT answer the question.
-Do NOT add information that is not present in the user's question.
+You are NOT answering the user.
 
 Rules:
-- Convert Saudi/Gulf colloquial Arabic into clear Arabic.
-- Normalize common spelling variations.
-- Preserve the original intent.
-- Make very short questions explicit when the intent is obvious.
-- Keep important service names and entities.
-- Keep the result short.
-- Return ONLY the rewritten query.
+
+1. Preserve the original intent exactly.
+2. Do not add facts, entities, services, prices, locations,
+   doctors, or other information that the user did not mention.
+3. Convert Saudi/Gulf colloquial Arabic into clear Arabic when useful.
+4. Normalize spelling mistakes and common dialect variations.
+5. Resolve obvious pronouns or references only when they are clear
+   from the user's own message.
+6. Keep important names, services, products, specialties, and entities.
+7. Do not make the query more specific than the original.
+8. Do not answer the question.
+9. Return ONLY the rewritten search query.
+10. If the original question is already clear, return a cleaned version
+    with minimal changes.
 
 Examples:
 
 User:
-شو رقمكم
+شو رقمكن؟
 
-Rewritten:
+Rewrite:
 ما هو رقم التواصل؟
 
 User:
-شو رقمكن
+وين موقعكم؟
 
-Rewritten:
-ما هو رقم التواصل؟
-
-User:
-طيب شو رقمكم
-
-Rewritten:
-ما هو رقم التواصل؟
-
-User:
-وين موقعكم
-
-Rewritten:
-ما هو الموقع الإلكتروني؟
-
-User:
-ايش موقع حكيم كير
-
-Rewritten:
+Rewrite:
 ما هو الموقع الإلكتروني لحكيم كير؟
 
 User:
-شو ايميلكم
+ايش ايميلكم؟
 
-Rewritten:
-ما هو البريد الإلكتروني؟
-
-User:
-كيف احجز دكتور
-
-Rewritten:
-كيف يمكن حجز موعد مع طبيب؟
+Rewrite:
+ما هو البريد الإلكتروني لحكيم كير؟
 
 User:
-عندكم دكتور مسالك
+عندكم دكتور مسالك؟
 
-Rewritten:
+Rewrite:
 هل تتوفر استشارة في تخصص المسالك البولية؟
 
 User:
-كم سعر قراءة التحاليل
+ابغى احجز دكتور
 
-Rewritten:
-كم تبلغ تكلفة قراءة نتائج التحاليل؟
+Rewrite:
+أرغب في حجز موعد مع طبيب.
+
+User:
+كم سعر قراءة التحاليل؟
+
+Rewrite:
+كم سعر قراءة نتائج التحاليل؟
+
+User:
+عندكم تحليل فيتامين د؟
+
+Rewrite:
+هل يتوفر تحليل فيتامين د؟
+
+User:
+ما وصلني رابط الموعد
+
+Rewrite:
+لم يصلني رابط موعد الطبيب.
+
+User:
+كيف اقدر اسأل دكتور؟
+
+Rewrite:
+كيف يمكن استخدام خدمة اسأل طبيب؟
+
+User:
+وش الخدمات اللي عندكم؟
+
+Rewrite:
+ما هي الخدمات التي تقدمها حكيم كير؟
+
+User:
+هل عندكم زيارة منزلية؟
+
+Rewrite:
+هل تتوفر خدمة الزيارة المنزلية؟
+
+User:
+ابغى اعرف عن المختبر
+
+Rewrite:
+أرغب في معرفة معلومات عن خدمات المختبر.
 
 User question:
 {question}
 """
+
+    response = client.messages.create(
+        model="claude-sonnet-5-5",
+        max_tokens=100,
+        messages=[
+            {
+                "role": "user",
+                "content": prompt,
+            }
+        ],
+    )
+
+    for block in response.content:
+        if getattr(block, "type", None) == "text" and block.text:
+            rewritten = block.text.strip()
+
+            if rewritten:
+                return rewritten
+
+    return question
 
     response = client.messages.create(
         model="claude-sonnet-5-5",
