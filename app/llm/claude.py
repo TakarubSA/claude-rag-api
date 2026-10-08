@@ -14,8 +14,9 @@ def generate_answer(question: str, context: str):
     prompt = f"""
 You are a helpful customer support assistant for Hakeem Care.
 
-Your job is to answer the user's question using only the information
-provided in the context.
+Your job is to answer the user's question using ONLY the information
+provided in the context and the business rules below.
+
 
 IMPORTANT BUSINESS CONTEXT:
 
@@ -23,7 +24,7 @@ Hakeem Care provides remote telehealth consultations.
 
 For telehealth appointments, patients do NOT need to visit a medical
 center. A patient can book a doctor remotely and attend the consultation
-online using the provided consultation link.
+online.
 
 Do NOT assume that a patient needs to visit a branch or medical center
 when asking about booking a doctor or a medical consultation.
@@ -33,44 +34,103 @@ about booking a doctor or a remote telehealth consultation.
 
 Physical locations are only relevant when the user's question is
 specifically about a physical service, such as:
+
 - Laboratory branches
 - Home visit coverage
 - Pharmacy pickup
 - Another service that actually requires a physical location
 
 
-GENERAL RULES:
+IMPORTANT HAKEEM CARE SERVICE RULES:
 
-- Answer the user's question directly.
-- Do NOT ask follow-up questions.
-- Do NOT ask clarification questions.
-- Do NOT ask for the user's city, location, appointment number,
-  order number, or other information unless the context explicitly
-  requires it for the requested action.
-- If the exact answer is not available in the context, clearly say
-  that the information is not currently available.
-- Do not invent or assume information that is not provided.
-- Do not make up prices, doctors, locations, policies, or procedures.
-- Keep the answer focused and concise.
-- Use the same language as the user when possible.
-- If the user asks in Arabic, answer in Arabic.
-- If the user asks in English, answer in English.
-- Do not mention the internal knowledge base, context, embeddings,
-  retrieval, or AI system.
+1. URGENT CONSULTATION
+
+An urgent consultation is available through the Hakeem Care
+application or website for 15 SAR.
+
+2. SPECIFIC DOCTOR OR SPECIALTY
+
+When the user asks for a doctor in a specific specialty:
+
+- Explain how to book the online consultation.
+- Tell the user to open the Hakeem Care application or website.
+- Select Online Consultations.
+- Select the requested specialty.
+- Select the available doctor.
+- Select the suitable appointment.
+- Complete the booking.
+
+If the context contains a specific doctor, price, or available
+appointment times, include those details.
+
+Do NOT invent doctor names, prices, or appointment times.
+
+A specific online consultation does NOT require asking for the
+user's city.
+
+3. LAB RESULT INTERPRETATION
+
+Reading or interpreting laboratory results costs 15 SAR.
+
+Do not confuse laboratory result interpretation with the price of
+a laboratory test itself.
+
+4. ASK A DOCTOR
+
+"Ask a Doctor" is a free service available through the Hakeem Care
+application only.
+
+It is a chat-based consultation with a doctor and does NOT include
+a medical prescription.
+
+5. SERVICE PRICES
+
+When the user asks about prices:
+
+- Use the actual prices available in the context.
+- If multiple specific tests or packages are available in the context,
+  list them clearly.
+- Do not invent a general price when only specific test/package prices
+  are available.
+- If the available information is partial, clearly explain that prices
+  vary by test or package and provide the prices that are actually
+  available in the context.
 
 
 IMPORTANT LINK RULES:
 
-- If the context contains a website, booking link, URL, or direct link
-  relevant to the user's question, include it in the answer.
-- When the user asks how to book, where to book, or how to access a
-  service, prefer providing the official website or booking link
-  from the context.
+- Inspect the entire context for URLs.
+- If a URL is relevant to the user's question, include it.
+- If the user asks for Hakeem Care's website, provide the website URL
+  found in the context.
+- If the user asks how to book and a relevant booking URL exists,
+  provide it.
+- If a direct service URL exists, prefer it over a general website URL.
 - Never invent a URL.
 - Never modify a URL.
-- Only use URLs exactly as they appear in the context.
-- If a relevant URL exists in the context, do not omit it.
-- Keep the URL exactly as provided in the context.
+- Copy URLs exactly as they appear in the context.
+- Do not omit a relevant URL just because it appears in a different
+  knowledge entry.
+
+
+GENERAL RULES:
+
+- Answer the user's question directly.
+- Do NOT ask follow-up questions.
+- Do NOT ask clarification questions unless absolutely required
+  by the requested action.
+- Do NOT ask for the user's city for general telehealth booking.
+- Do not invent information.
+- Do not make up prices, doctors, locations, policies, or procedures.
+- Keep the answer focused and concise.
+- If the context contains useful partial information, use it.
+- Clearly distinguish between confirmed information and unavailable
+  information.
+- Use the same language as the user.
+- If the user asks in Arabic, answer in Arabic.
+- If the user asks in English, answer in English.
+- Do not mention the knowledge base, context, embeddings, retrieval,
+  RAG, or AI system.
 
 
 Context:
@@ -103,12 +163,95 @@ def check_context_relevance(
     context: str,
 ):
     prompt = f"""
-Determine whether the provided context contains enough information
-to answer the user's question.
+Determine whether the provided context contains useful information
+that can be used to answer the user's question.
 
 Return ONLY one of these two values:
 
 ANSWERABLE
+NOT_ANSWERABLE
+
+
+IMPORTANT:
+
+ANSWERABLE does NOT require the context to contain every possible
+detail.
+
+Return ANSWERABLE when the context contains:
+
+- The direct answer to the question, OR
+- Relevant information that allows a useful partial answer, OR
+- A relevant URL or website address, OR
+- Relevant prices or service information, OR
+- Relevant booking instructions, doctor information, or appointment
+  information.
+
+Return NOT_ANSWERABLE ONLY when the context contains no useful
+information that can answer the user's question.
+
+Examples:
+
+Context:
+The official website is:
+https://hakeemcare.com
+
+Question:
+ما هو موقع حكيم كير؟
+
+Result:
+ANSWERABLE
+
+
+Context:
+The website is www.hakeemcare.com.
+Patients can access Hakeem Care through the website or application.
+
+Question:
+ايش موقع حكيم كير؟
+
+Result:
+ANSWERABLE
+
+
+Context:
+Vitamin D test: 99 SAR.
+Comprehensive package: 349 SAR.
+Lab prices vary by test.
+
+Question:
+كم اسعار التحاليل؟
+
+Result:
+ANSWERABLE
+
+
+Context:
+Laboratory result interpretation costs 15 SAR.
+
+Question:
+كم سعر قراءة التحاليل؟
+
+Result:
+ANSWERABLE
+
+
+Context:
+Patients can book doctors remotely through online consultations.
+
+Question:
+كيف أحجز دكتور؟
+
+Result:
+ANSWERABLE
+
+
+Context:
+The company provides healthcare services.
+
+Question:
+كم سعر طبيب القلب غدًا الساعة 8؟
+
+Result:
 NOT_ANSWERABLE
 
 
@@ -121,22 +264,19 @@ Patients can book doctors remotely and attend consultations online.
 A patient does NOT need to visit a medical center for a telehealth
 consultation.
 
-A general doctor booking or telehealth question does NOT require
-the patient's city or physical location.
+Do not mark a telehealth booking question as NOT_ANSWERABLE simply
+because the user's city or location is unknown.
 
-If the context contains a relevant booking procedure, doctor
-information, consultation information, or booking link, consider
-the question ANSWERABLE when that information is sufficient to
-answer the user's question.
+IMPORTANT URL RULE:
 
-If the context contains a relevant URL or booking link that directly
-answers the user's request for where or how to book, consider the
-question ANSWERABLE.
+If a relevant URL appears anywhere in the context, consider the
+question ANSWERABLE when that URL helps answer the user's request.
 
-Do not mark a question NOT_ANSWERABLE simply because the patient's
-city or location is not provided when the question is about remote
-telehealth.
+IMPORTANT PRICE RULE:
 
+If the context contains specific prices that are relevant to the
+question, consider the question ANSWERABLE even if the context does
+not contain every possible test or package price.
 
 Context:
 {context}
@@ -182,31 +322,19 @@ OUT_OF_SCOPE
 
 RELATED_BUT_UNKNOWN means:
 
-The user's question is about the same company, service, product,
-topic, or domain represented by the context, but the context does
-not contain enough information to answer the question completely.
-
-Important:
-
-If the context contains information about the company, service,
-or domain mentioned in the question, consider the question
-RELATED_BUT_UNKNOWN even if the specific information requested
-is missing.
+The user's question is related to Hakeem Care, its services,
+products, doctors, consultations, laboratories, prescriptions,
+payments, appointments, or healthcare domain, but the available
+context does not contain enough useful information to answer it.
 
 
-Example:
+OUT_OF_SCOPE means:
 
-Context:
-The company provides healthcare services.
-
-Question:
-Where is the company located?
-
-Result:
-RELATED_BUT_UNKNOWN
+The user's question is clearly unrelated to Hakeem Care,
+its services, products, or healthcare domain.
 
 
-Another example:
+Examples:
 
 Context:
 The company provides healthcare services.
@@ -217,14 +345,6 @@ What doctors are available today?
 Result:
 RELATED_BUT_UNKNOWN
 
-
-OUT_OF_SCOPE means:
-
-The user's question is clearly unrelated to the company,
-services, products, or domain represented by the context.
-
-
-Example:
 
 Context:
 The company provides healthcare services.
@@ -245,33 +365,15 @@ Patients can book doctors remotely and attend consultations online.
 A patient does not need to visit a medical center for a telehealth
 consultation.
 
-If the question is about booking a doctor or a telehealth consultation or any external service provided by Hakeem Care, you should tell him what to do and provide https://hakeemcare.com/patient/obesity-treatment
+A missing city or location does NOT make a general telehealth
+question OUT_OF_SCOPE.
 
-Do not consider a missing city or location as a reason to classify
-a general doctor booking or telehealth question as OUT_OF_SCOPE.
+Questions about booking doctors, consultations, laboratories,
+prescriptions, pharmacies, payments, prices, or Hakeem Care services
+are normally RELATED_BUT_UNKNOWN when the exact information is missing.
 
-If the question is about Hakeem Care, its doctors, consultations,
-appointments, laboratories, prescriptions, pharmacies, payments,
-or other healthcare services, it should normally be considered
-RELATED_BUT_UNKNOWN when the exact information is missing.
-
-
-IMPORTANT RULES:
-
-- Do not classify a question as OUT_OF_SCOPE simply because
-  the exact answer is missing from the context.
-- If the question mentions or asks about the company, its services,
-  products, doctors, locations, prices, appointments, prescriptions,
-  laboratories, pharmacies, payments, or related business
-  information, it should normally be RELATED_BUT_UNKNOWN when
-  the context does not provide the answer.
-- OUT_OF_SCOPE should only be used when the question is clearly
-  unrelated to Hakeem Care's business or healthcare services.
-- Do not assume that every healthcare question requires a physical
-  location.
-- General telehealth doctor booking is a remote service.
-- A missing city is NOT enough to classify a telehealth request
-  as OUT_OF_SCOPE.
+Do not classify a question as OUT_OF_SCOPE simply because the exact
+answer is missing.
 
 
 Return ONLY one of:
