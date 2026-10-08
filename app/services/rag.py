@@ -16,12 +16,13 @@ CASUAL_MARKER = "__CASUAL_CONVERSATION__"
 
 SEARCH_LIMIT = 8
 CONTEXT_LIMIT = 6
+
+# Keep disabled until retrieval quality is tested properly.
 USE_RERANK = False
 
 
-# Knowledge entries sometimes contain example questions after this marker.
-# They can pollute the context, so we remove them before sending context
-# to the LLM.
+# Knowledge entries can contain generated example questions.
+# They add noise without necessarily adding evidence.
 NOISE_MARKERS = (
     "هذه المعلومة تشمل أسئلة مثل",
 )
@@ -29,7 +30,7 @@ NOISE_MARKERS = (
 
 def _clean_text(text: str) -> str:
     """
-    Lightweight normalization of the user's original message.
+    Lightweight normalization for the user's original message.
     """
 
     text = (text or "").strip()
@@ -41,7 +42,6 @@ def _clean_text(text: str) -> str:
         text,
     )
 
-    # Collapse exaggerated repeated characters:
     # هلااااا -> هلاا
     text = re.sub(
         r"(.)\1{2,}",
@@ -50,16 +50,18 @@ def _clean_text(text: str) -> str:
     )
 
     # Collapse whitespace.
-    return re.sub(
+    text = re.sub(
         r"\s+",
         " ",
         text,
     )
 
+    return text.strip()
+
 
 def _clean_content(content: str) -> str:
     """
-    Clean retrieved knowledge before sending it to Claude.
+    Clean a retrieved knowledge entry before sending it to Claude.
     """
 
     content = content or ""
@@ -76,10 +78,10 @@ def _search_many(
     client_id: int,
 ):
     """
-    Embed all retrieval queries in a single Voyage request,
-    then search each query against the current client's knowledge.
+    Run semantic retrieval for all queries in one embedding request.
 
-    Multi-tenant isolation remains enforced by client_id.
+    client_id is always passed to the repository so knowledge
+    isolation remains tenant-specific.
     """
 
     try:
@@ -98,20 +100,27 @@ def _search_many(
         print(
             f"SEARCH ERROR: {e}"
         )
+
+        # IMPORTANT:
+        # Retrieval failure does NOT mean the AI cannot answer.
+        # The caller can still use client_config as a source of truth.
         return None
 
 
 def _merge(*result_lists):
     """
-    Merge results from multiple retrieval queries.
+    Merge retrieval results from multiple queries.
 
-    If the same knowledge row appears more than once,
+    If the same knowledge row appears multiple times,
     keep the best semantic distance.
     """
 
     best = {}
 
     for results in result_lists:
+        if not results:
+            continue
+
         for result in results:
             if (
                 result.id not in best
@@ -130,9 +139,9 @@ def _rerank(
     results,
 ):
     """
-    Optional Voyage reranking layer.
+    Optional Voyage reranking.
 
-    Disabled by default until explicitly enabled and tested.
+    Disabled by default.
     """
 
     if not USE_RERANK or len(results) < 2:
@@ -172,39 +181,112 @@ def _rerank(
         return results
 
 
+def _build_context(results) -> str:
+    """
+    Convert retrieved rows into clean LLM context.
+
+    Returns an empty string when no useful knowledge was retrieved.
+    """
+
+    if not results:
+        return ""
+
+    cleaned_entries = []
+
+    for result in results:
+        content = _clean_content(
+            result.content
+        )
+
+        if content:
+            cleaned_entries.append(
+                content
+            )
+
+    return "\n\n".join(
+        cleaned_entries
+    )
+
+
+def _generate_grounded_answer(
+    question: str,
+    context: str,
+    client_config: dict | None,
+    best_distance=None,
+):
+    """
+    Ask Claude to answer using BOTH:
+
+    1. client_config
+    2. retrieved knowledge
+
+    The context is allowed to be empty.
+
+    This is important because basic business questions such as
+    website, company identity, workflows, and stable business
+    rules can often be answered directly from client configuration.
+    """
+
+    relevance = check_context_relevance(
+        question=question,
+        context=context,
+        client_config=client_config,
+    )
+
+    print(
+        "CONTEXT RELEVANCE:",
+        relevance,
+    )
+
+    if relevance == "ANSWERABLE":
+        return {
+            "answer": generate_answer(
+                question=question,
+                context=context,
+                client_config=client_config,
+            ),
+            "best_distance": best_distance,
+            "status": "KNOWN",
+        }
+
+    return None
+
+
 def answer_question(
     question: str,
     client_id: int,
     client_config: dict | None = None,
 ):
     """
-    Main RAG orchestration pipeline.
+    Main multi-tenant RAG orchestration.
 
-    Flow:
+    Important architectural rule:
+
+        Retrieved knowledge is evidence.
+        Client configuration is also evidence.
+
+    Retrieval failure or an empty knowledge result must NOT
+    automatically mean that the assistant cannot answer.
+
+    Pipeline:
 
         user question
             ↓
         query understanding
             ↓
-        vector retrieval
-            ↓
-        merge
-            ↓
-        optional rerank
+        semantic retrieval
             ↓
         context construction
             ↓
-        relevance evaluation
+        client_config + context
+            ↓
+        evidence evaluation
             ↓
         grounded answer
             OR
         knowledge-gap classification
             ↓
-        safe fallback
-
-    client_config is passed to every LLM layer so that the
-    pipeline remains completely tenant-aware without hardcoding
-    any specific business.
+        deterministic fallback
     """
 
     print(
@@ -213,7 +295,7 @@ def answer_question(
     )
 
     # --------------------------------------------------------------
-    # 1. Clean original question
+    # 1. Normalize original question
     # --------------------------------------------------------------
 
     cleaned_question = _clean_text(
@@ -221,7 +303,7 @@ def answer_question(
     )
 
     # --------------------------------------------------------------
-    # 2. Understand / rewrite the question
+    # 2. Understand the query
     # --------------------------------------------------------------
 
     search_query = rewrite_query(
@@ -261,8 +343,9 @@ def answer_question(
         search_query,
     ]
 
-    # Keep the original normalized message as a second retrieval query.
-    # This protects against a weak or overly aggressive rewrite.
+    # Also keep the cleaned original.
+    # This protects against a rewrite that accidentally loses
+    # an important keyword/entity.
     if (
         cleaned_question
         and cleaned_question != search_query
@@ -280,27 +363,20 @@ def answer_question(
         client_id,
     )
 
-    # Search / embedding failure is not the same thing as
-    # "knowledge does not exist".
-if result_lists is None:
-    print(
-        "SEARCH UNAVAILABLE - TRYING CLIENT CONFIG ONLY"
+    search_failed = (
+        result_lists is None
     )
 
-    answer = generate_answer(
-        question=question,
-        context="",
-        client_config=client_config,
-    )
+    if search_failed:
+        print(
+            "RETRIEVAL UNAVAILABLE:"
+            " continuing with client configuration."
+        )
 
-    return {
-        "answer": answer,
-        "best_distance": None,
-        "status": "CONFIG_ONLY",
-    }
+        result_lists = []
 
     # --------------------------------------------------------------
-    # 6. Merge retrieval results
+    # 6. Merge results
     # --------------------------------------------------------------
 
     results = _merge(
@@ -311,42 +387,49 @@ if result_lists is None:
     # 7. Optional reranking
     # --------------------------------------------------------------
 
-    results = _rerank(
-        search_query,
-        results,
-    )
-
-    results = results[:CONTEXT_LIMIT]
-
-    # --------------------------------------------------------------
-    # 8. Debug retrieved knowledge
-    # --------------------------------------------------------------
-
-    for result in results:
-        print(
-            "ID:",
-            result.id,
+    if results:
+        results = _rerank(
+            search_query,
+            results,
         )
 
-        print(
-            "DISTANCE:",
-            result.distance,
-        )
-
-        print(
-            "CONTENT:",
-            result.content,
-        )
-
-        print("---")
+        results = results[
+            :CONTEXT_LIMIT
+        ]
 
     # --------------------------------------------------------------
-    # 9. Build clean context
+    # 8. Debug retrieved evidence
     # --------------------------------------------------------------
 
-    context = "\n\n".join(
-        _clean_content(result.content)
-        for result in results
+    if results:
+        for result in results:
+            print(
+                "ID:",
+                result.id,
+            )
+
+            print(
+                "DISTANCE:",
+                result.distance,
+            )
+
+            print(
+                "CONTENT:",
+                result.content,
+            )
+
+            print("---")
+    else:
+        print(
+            "NO RETRIEVED KNOWLEDGE"
+        )
+
+    # --------------------------------------------------------------
+    # 9. Build context
+    # --------------------------------------------------------------
+
+    context = _build_context(
+        results
     )
 
     print(
@@ -355,6 +438,8 @@ if result_lists is None:
 
     print(
         context
+        if context
+        else "[empty]"
     )
 
     print(
@@ -368,63 +453,34 @@ if result_lists is None:
     )
 
     # --------------------------------------------------------------
-    # 10. Nothing retrieved
+    # 10. Try answering from ALL available evidence
+    #
+    #     This is the important part:
+    #
+    #     context can be empty.
+    #     Claude still receives client_config.
     # --------------------------------------------------------------
 
-    if not results:
-        gap_type = classify_knowledge_gap(
-            question=question,
-            context="",
-            client_config=client_config,
-        )
-
-        print(
-            "KNOWLEDGE GAP:",
-            gap_type,
-        )
-
-        return {
-            "answer": generate_fallback_answer(
-                question=question,
-                gap_type=gap_type,
-                client_config=client_config,
-            ),
-            "best_distance": None,
-            "status": gap_type,
-        }
-
-    # --------------------------------------------------------------
-    # 11. Evaluate context relevance
-    # --------------------------------------------------------------
-
-    relevance = check_context_relevance(
+    grounded_result = _generate_grounded_answer(
         question=question,
         context=context,
         client_config=client_config,
+        best_distance=best_distance,
     )
 
-    print(
-        "CONTEXT RELEVANCE:",
-        relevance,
-    )
+    if grounded_result:
+        # If retrieval failed but configuration was enough,
+        # this is still a valid known answer.
+        if search_failed:
+            grounded_result["status"] = "CONFIG_ONLY"
+
+        elif not results:
+            grounded_result["status"] = "CONFIG_ONLY"
+
+        return grounded_result
 
     # --------------------------------------------------------------
-    # 12. Generate grounded answer
-    # --------------------------------------------------------------
-
-    if relevance == "ANSWERABLE":
-        return {
-            "answer": generate_answer(
-                question=question,
-                context=context,
-                client_config=client_config,
-            ),
-            "best_distance": best_distance,
-            "status": "KNOWN",
-        }
-
-    # --------------------------------------------------------------
-    # 13. Context not sufficient
+    # 11. We don't have enough evidence
     # --------------------------------------------------------------
 
     gap_type = classify_knowledge_gap(
@@ -439,7 +495,7 @@ if result_lists is None:
     )
 
     # --------------------------------------------------------------
-    # 14. Safe fallback
+    # 12. Safe deterministic fallback
     # --------------------------------------------------------------
 
     return {
@@ -449,5 +505,9 @@ if result_lists is None:
             client_config=client_config,
         ),
         "best_distance": best_distance,
-        "status": gap_type,
+        "status": (
+            "SEARCH_ERROR"
+            if search_failed
+            else gap_type
+        ),
     }
