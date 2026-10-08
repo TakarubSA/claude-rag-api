@@ -12,8 +12,7 @@ client = anthropic.Anthropic(
     api_key=os.getenv("ANTHROPIC_API_KEY")
 )
 
-# MODEL = "claude-sonnet-5-5"
-MODEL = "claude-haiku-4-5-20251001"
+MODEL = "claude-sonnet-5-5"
 WEBSITE_URL = "https://hakeemcare.com/"
 
 
