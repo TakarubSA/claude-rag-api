@@ -3,11 +3,119 @@ import os
 import anthropic
 from dotenv import load_dotenv
 
+
 load_dotenv()
+
 
 client = anthropic.Anthropic(
     api_key=os.getenv("ANTHROPIC_API_KEY")
 )
+
+
+def rewrite_query(question: str) -> str:
+    """
+    Rewrite the user's question into a clearer search query.
+
+    This function does NOT answer the user.
+    It only improves the query before embedding/retrieval.
+    """
+
+    prompt = f"""
+You are a query rewriting assistant for Hakeem Care.
+
+Your job is ONLY to rewrite the user's question into a clear search query
+for knowledge retrieval.
+
+Do NOT answer the question.
+Do NOT add information that is not present in the user's question.
+
+Rules:
+- Convert Saudi/Gulf colloquial Arabic into clear Arabic.
+- Normalize common spelling variations.
+- Preserve the original intent.
+- Make very short questions explicit when the intent is obvious.
+- Keep important service names and entities.
+- Keep the result short.
+- Return ONLY the rewritten query.
+
+Examples:
+
+User:
+شو رقمكم
+
+Rewritten:
+ما هو رقم التواصل؟
+
+User:
+شو رقمكن
+
+Rewritten:
+ما هو رقم التواصل؟
+
+User:
+طيب شو رقمكم
+
+Rewritten:
+ما هو رقم التواصل؟
+
+User:
+وين موقعكم
+
+Rewritten:
+ما هو الموقع الإلكتروني؟
+
+User:
+ايش موقع حكيم كير
+
+Rewritten:
+ما هو الموقع الإلكتروني لحكيم كير؟
+
+User:
+شو ايميلكم
+
+Rewritten:
+ما هو البريد الإلكتروني؟
+
+User:
+كيف احجز دكتور
+
+Rewritten:
+كيف يمكن حجز موعد مع طبيب؟
+
+User:
+عندكم دكتور مسالك
+
+Rewritten:
+هل تتوفر استشارة في تخصص المسالك البولية؟
+
+User:
+كم سعر قراءة التحاليل
+
+Rewritten:
+كم تبلغ تكلفة قراءة نتائج التحاليل؟
+
+User question:
+{question}
+"""
+
+    response = client.messages.create(
+        model="claude-sonnet-5-5",
+        max_tokens=80,
+        messages=[
+            {
+                "role": "user",
+                "content": prompt,
+            }
+        ],
+    )
+
+    for block in response.content:
+        if getattr(block, "type", None) == "text" and block.text:
+            return block.text.strip()
+
+    # Fallback:
+    # If Claude doesn't return a text block, keep the original query.
+    return question
 
 
 def generate_answer(question: str, context: str):
@@ -16,7 +124,6 @@ You are a helpful customer support assistant for Hakeem Care.
 
 Your job is to answer the user's question using ONLY the information
 provided in the context and the business rules below.
-
 
 IMPORTANT BUSINESS CONTEXT:
 
@@ -43,10 +150,12 @@ specifically about a physical service, such as:
 
 IMPORTANT HAKEEM CARE SERVICE RULES:
 
+
 1. URGENT CONSULTATION
 
 An urgent consultation is available through the Hakeem Care
 application or website for 15 SAR.
+
 
 2. SPECIFIC DOCTOR OR SPECIALTY
 
@@ -68,12 +177,14 @@ Do NOT invent doctor names, prices, or appointment times.
 A specific online consultation does NOT require asking for the
 user's city.
 
+
 3. LAB RESULT INTERPRETATION
 
 Reading or interpreting laboratory results costs 15 SAR.
 
 Do not confuse laboratory result interpretation with the price of
 a laboratory test itself.
+
 
 4. ASK A DOCTOR
 
@@ -82,6 +193,7 @@ application only.
 
 It is a chat-based consultation with a doctor and does NOT include
 a medical prescription.
+
 
 5. SERVICE PRICES
 
@@ -132,11 +244,12 @@ GENERAL RULES:
 - Do not mention the knowledge base, context, embeddings, retrieval,
   RAG, or AI system.
 
-
 Context:
+
 {context}
 
 User question:
+
 {question}
 """
 
@@ -152,7 +265,7 @@ User question:
     )
 
     for block in response.content:
-        if hasattr(block, "text") and block.text:
+        if getattr(block, "type", None) == "text" and block.text:
             return block.text
 
     raise RuntimeError("Claude did not return a text response")
@@ -170,7 +283,6 @@ Return ONLY one of these two values:
 
 ANSWERABLE
 NOT_ANSWERABLE
-
 
 IMPORTANT:
 
@@ -193,6 +305,7 @@ Examples:
 
 Context:
 The official website is:
+
 https://hakeemcare.com
 
 Question:
@@ -204,6 +317,7 @@ ANSWERABLE
 
 Context:
 The website is www.hakeemcare.com.
+
 Patients can access Hakeem Care through the website or application.
 
 Question:
@@ -215,7 +329,9 @@ ANSWERABLE
 
 Context:
 Vitamin D test: 99 SAR.
+
 Comprehensive package: 349 SAR.
+
 Lab prices vary by test.
 
 Question:
@@ -279,9 +395,11 @@ question, consider the question ANSWERABLE even if the context does
 not contain every possible test or package price.
 
 Context:
+
 {context}
 
 User question:
+
 {question}
 """
 
@@ -297,7 +415,7 @@ User question:
     )
 
     for block in response.content:
-        if hasattr(block, "text") and block.text:
+        if getattr(block, "type", None) == "text" and block.text:
             result = block.text.strip().upper()
 
             if result in {
@@ -319,7 +437,6 @@ Classify the user's question into exactly one of these two categories:
 RELATED_BUT_UNKNOWN
 OUT_OF_SCOPE
 
-
 RELATED_BUT_UNKNOWN means:
 
 The user's question is related to Hakeem Care, its services,
@@ -327,12 +444,10 @@ products, doctors, consultations, laboratories, prescriptions,
 payments, appointments, or healthcare domain, but the available
 context does not contain enough useful information to answer it.
 
-
 OUT_OF_SCOPE means:
 
 The user's question is clearly unrelated to Hakeem Care,
 its services, products, or healthcare domain.
-
 
 Examples:
 
@@ -375,17 +490,17 @@ are normally RELATED_BUT_UNKNOWN when the exact information is missing.
 Do not classify a question as OUT_OF_SCOPE simply because the exact
 answer is missing.
 
-
 Return ONLY one of:
 
 RELATED_BUT_UNKNOWN
 OUT_OF_SCOPE
 
-
 Context:
+
 {context}
 
 User question:
+
 {question}
 """
 
@@ -401,7 +516,7 @@ User question:
     )
 
     for block in response.content:
-        if hasattr(block, "text") and block.text:
+        if getattr(block, "type", None) == "text" and block.text:
             result = block.text.strip().upper()
 
             if result in {

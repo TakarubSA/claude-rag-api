@@ -1,6 +1,7 @@
 from app.embeddings.voyage import create_embedding
 from app.knowledge.repository import search_knowledge
 from app.llm.claude import (
+    rewrite_query,
     generate_answer,
     check_context_relevance,
     classify_knowledge_gap,
@@ -8,10 +9,16 @@ from app.llm.claude import (
 
 
 def answer_question(question: str, client_id: int):
-    # 1. Convert the user's question into an embedding
-    query_embedding = create_embedding(question)
+    # 1. Rewrite the user's question for better retrieval
+    search_query = rewrite_query(question)
 
-    # 2. Find relevant knowledge for this client only
+    print("ORIGINAL QUERY:", question)
+    print("SEARCH QUERY:", search_query)
+
+    # 2. Convert the rewritten query into an embedding
+    query_embedding = create_embedding(search_query)
+
+    # 3. Find relevant knowledge for this client only
     results = search_knowledge(
         query_embedding,
         client_id=client_id,
@@ -25,7 +32,7 @@ def answer_question(question: str, client_id: int):
         print("CONTENT:", result.content)
         print("---")
 
-    # 3. Build the context that Claude will receive
+    # 4. Build the context that Claude will receive
     context = "\n\n".join(
         result.content
         for result in results
@@ -36,7 +43,7 @@ def answer_question(question: str, client_id: int):
     print(context)
     print("========================================\n")
 
-    # 4. Check if the retrieved context can answer the question
+    # 5. Check if the retrieved context can answer the original question
     relevance = check_context_relevance(
         question=question,
         context=context,
@@ -44,7 +51,7 @@ def answer_question(question: str, client_id: int):
 
     print("CONTEXT RELEVANCE:", relevance)
 
-    # 5. If the context is enough, generate the answer
+    # 6. If the context is enough, generate the answer
     if relevance == "ANSWERABLE":
         answer = generate_answer(
             question=question,
@@ -59,7 +66,7 @@ def answer_question(question: str, client_id: int):
             "status": "KNOWN",
         }
 
-    # 6. Context was not enough to answer the question
+    # 7. Context was not enough to answer the question
     gap_type = classify_knowledge_gap(
         question=question,
         context=context,
