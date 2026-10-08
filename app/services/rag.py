@@ -1,6 +1,6 @@
 import re
 
-from app.embeddings.voyage import create_embedding
+from app.embeddings.voyage import create_embeddings  # batch version, see notes
 from app.knowledge.repository import search_knowledge
 from app.llm.claude import (
     rewrite_query,
@@ -37,13 +37,21 @@ def _clean_content(content: str) -> str:
     return content.strip()
 
 
-def _search(text: str, client_id: int):
+def _search_many(texts, client_id: int):
+    """
+    Embed all texts in ONE Voyage request (important with low rate limits),
+    then search for each. Returns a list of result lists, or None if the
+    embedding/search failed (so we never confuse an outage with 'no answer').
+    """
     try:
-        embedding = create_embedding(text)
-        return search_knowledge(embedding, client_id=client_id, limit=SEARCH_LIMIT)
+        embeddings = create_embeddings(texts)
+        return [
+            search_knowledge(emb, client_id=client_id, limit=SEARCH_LIMIT)
+            for emb in embeddings
+        ]
     except Exception as e:
-        print(f"SEARCH ERROR for '{text}': {e}")
-        return []
+        print(f"SEARCH ERROR: {e}")
+        return None
 
 
 def _merge(*result_lists):
@@ -99,13 +107,22 @@ def answer_question(question: str, client_id: int):
 
     # 3. Search with BOTH the rewritten query and the cleaned original.
     #    If the rewrite is weak or wrong, the original still finds the entry.
-    results_rewritten = _search(search_query, client_id)
+    texts = [search_query]
     if cleaned_question and cleaned_question != search_query:
-        results_original = _search(cleaned_question, client_id)
-    else:
-        results_original = []
+        texts.append(cleaned_question)
 
-    results = _merge(results_rewritten, results_original)
+    result_lists = _search_many(texts, client_id)
+
+    if result_lists is None:
+        # Embedding/search service failed (e.g. rate limit). Do not guess and
+        # do not report it as a knowledge gap: send the user to the website.
+        return {
+            "answer": generate_fallback_answer(question, "RELATED_BUT_UNKNOWN"),
+            "best_distance": None,
+            "status": "SEARCH_ERROR",
+        }
+
+    results = _merge(*result_lists)
     results = _rerank(search_query, results)[:CONTEXT_LIMIT]
 
     for result in results:

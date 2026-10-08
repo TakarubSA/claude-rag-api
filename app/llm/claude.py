@@ -37,16 +37,31 @@ def _call_claude(prompt: str, max_tokens: int):
     Single place for all Claude calls.
     Returns text or None (never raises), so the pipeline never crashes.
     """
-    try:
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=max_tokens,
-            messages=[{"role": "user", "content": prompt}],
+    # The model may spend the whole max_tokens budget on a thinking block and
+    # return no text (seen in production logs with tiny budgets like 20-30).
+    # If that happens, retry once with a much larger budget.
+    for attempt in range(2):
+        budget = max_tokens if attempt == 0 else max(max_tokens, 1024) + 1500
+        try:
+            response = client.messages.create(
+                model=MODEL,
+                max_tokens=budget,
+                messages=[{"role": "user", "content": prompt}],
+            )
+        except Exception as e:
+            print(f"[claude_service] API error: {e}")
+            return None
+
+        text = _extract_text(response)
+        if text:
+            return text
+
+        print(
+            "[claude_service] no text block "
+            f"(stop_reason={getattr(response, 'stop_reason', None)}), retrying"
         )
-        return _extract_text(response)
-    except Exception as e:
-        print(f"[claude_service] API error: {e}")
-        return None
+
+    return None
 
 
 def _is_arabic(text: str) -> bool:
@@ -190,6 +205,13 @@ SEARCH QUERY RULES
 - Do not invent services, doctors, prices, locations, or entities.
 - Keep important names, services, specialties, products, entities.
 - Do not make the query more specific than the original.
+- Keep the user's own key words. Only fix spelling and dialect. If a
+  phrase is ambiguous, keep it ambiguous. Do NOT choose one meaning.
+  User: كيف اعرف مواعيد الادويه
+  Result: SEARCH_QUERY: كيف أعرف مواعيد الأدوية؟
+  (NOT: "مواعيد تناول الأدوية" and NOT "مواعيد توصيل الأدوية")
+  User: مين انتم
+  Result: SEARCH_QUERY: من هي حكيم كير وما هي خدماتها؟
 - Make short ambiguous questions clearer only when the intent is obvious.
 - If the user describes symptoms or asks about medication, keep the
   question as is (do not answer it), e.g.
@@ -349,6 +371,24 @@ STRICT GROUNDING RULES (MOST IMPORTANT)
       accurate information: {WEBSITE_URL}
 - Always include {WEBSITE_URL} when you cannot fully answer.
 
+- MEDICATION QUESTIONS (how/when to take a drug, interactions, side
+  effects): do NOT answer them yourself. If the context mentions the
+  free pharmacist consultation, direct the user to it. Otherwise
+  direct them to Ask a Doctor / a doctor consultation.
+- If a question is ambiguous (e.g. "مواعيد الأدوية" could mean when to
+  take a medicine, or a prescription/delivery status), do not ask
+  back. Briefly cover the possible meanings using only the context
+  (pharmacist consultation for usage, order tracking for delivery).
+- If the context has several website URLs, always use {WEBSITE_URL}
+  as the official website. Ignore shortened or tracking links.
+- If the context mentions a link only by name (e.g. "رابط مواعيد
+  الصحة النفسية") without a real URL, do NOT present it as a link.
+  Say where to find it (app/website) and give {WEBSITE_URL}.
+- If a knowledge entry ends with a question to the user, turn it into
+  a statement or drop it. Do not ask the user questions.
+- Ignore irrelevant parts of the context (other services, headings
+  such as "Order Tracking", lists of example questions).
+
 ==================================================
 BUSINESS CONTEXT
 ==================================================
@@ -502,6 +542,15 @@ Hakeem Care provides remote telehealth consultations.
 Patients can book doctors remotely and attend consultations online.
 Do not mark a telehealth booking question as NOT_ANSWERABLE simply
 because the user's city or location is unknown.
+
+IMPORTANT REDIRECT RULE:
+If the context lets us point the user to the RIGHT Hakeem Care service
+for their need (for example the free pharmacist consultation for
+questions about taking medication, Ask a Doctor, booking a
+consultation, prescription or order tracking), return ANSWERABLE.
+Directing the user to the correct service is a valid answer.
+For vague questions, if ANY entry in the context is relevant to one of
+the likely meanings, return ANSWERABLE.
 
 IMPORTANT URL RULE:
 If a relevant URL appears anywhere in the context, consider the
