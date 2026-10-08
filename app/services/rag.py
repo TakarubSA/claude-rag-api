@@ -282,16 +282,22 @@ def answer_question(
 
     # Search / embedding failure is not the same thing as
     # "knowledge does not exist".
-    if result_lists is None:
-        return {
-            "answer": generate_fallback_answer(
-                question=question,
-                gap_type="RELATED_BUT_UNKNOWN",
-                client_config=client_config,
-            ),
-            "best_distance": None,
-            "status": "SEARCH_ERROR",
-        }
+if result_lists is None:
+    print(
+        "SEARCH UNAVAILABLE - TRYING CLIENT CONFIG ONLY"
+    )
+
+    answer = generate_answer(
+        question=question,
+        context="",
+        client_config=client_config,
+    )
+
+    return {
+        "answer": answer,
+        "best_distance": None,
+        "status": "CONFIG_ONLY",
+    }
 
     # --------------------------------------------------------------
     # 6. Merge retrieval results
