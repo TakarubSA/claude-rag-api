@@ -12,105 +12,229 @@ client = anthropic.Anthropic(
 )
 
 
+def _extract_text(response):
+    """
+    Extract the first text block from a Claude response.
+    Ignores thinking/tool blocks.
+    """
+    for block in response.content:
+        if getattr(block, "type", None) == "text" and block.text:
+            return block.text.strip()
+
+    return None
+
+
 def rewrite_query(question: str) -> str:
+    """
+    Rewrite a user question for better retrieval.
+
+    Returns:
+        - A rewritten search query
+        - "__CASUAL_CONVERSATION__" for simple social/conversational messages
+    """
+
     prompt = f"""
-You are a query rewriting component for a Hakeem Care RAG system.
+You are a query understanding and rewriting component for a Hakeem Care
+RAG system.
 
-Your ONLY task is to rewrite the user's message into a clear,
-concise search query that preserves the exact meaning and intent
-of the original message.
+Your job is to understand the user's message and decide whether it is:
 
-You are NOT answering the user.
+1. A REAL INFORMATION / SERVICE QUERY
+2. A CASUAL CONVERSATIONAL MESSAGE
 
-Rules:
+Return ONLY ONE of the following:
 
-1. Preserve the original intent exactly.
-2. Do not add facts, entities, services, prices, locations,
-   doctors, or other information that the user did not mention.
-3. Convert Saudi/Gulf colloquial Arabic into clear Arabic when useful.
-4. Normalize spelling mistakes and common dialect variations.
-5. Resolve obvious pronouns or references only when they are clear
-   from the user's own message.
-6. Keep important names, services, products, specialties, and entities.
-7. Do not make the query more specific than the original.
-8. Do not answer the question.
-9. Return ONLY the rewritten search query.
-10. If the original question is already clear, return a cleaned version
-    with minimal changes.
+SEARCH_QUERY: <rewritten query>
+
+or
+
+CASUAL_CONVERSATION
+
+==================================================
+CASUAL CONVERSATION
+==================================================
+
+Use CASUAL_CONVERSATION only when the user is simply being social,
+friendly, polite, or conversational and is NOT asking for information
+about Hakeem Care, healthcare, services, doctors, prices, appointments,
+labs, prescriptions, payments, locations, or any other actual request.
+
+Examples:
+
+User:
+كيفك؟
+
+Result:
+CASUAL_CONVERSATION
+
+User:
+كيف حالك؟
+
+Result:
+CASUAL_CONVERSATION
+
+User:
+كيف اخبارك؟
+
+Result:
+CASUAL_CONVERSATION
+
+User:
+كيفك يا غالي؟
+
+Result:
+CASUAL_CONVERSATION
+
+User:
+هلا
+
+Result:
+CASUAL_CONVERSATION
+
+User:
+يا هلا والله
+
+Result:
+CASUAL_CONVERSATION
+
+User:
+يعطيكم العافية
+
+Result:
+CASUAL_CONVERSATION
+
+User:
+شكراً
+
+Result:
+CASUAL_CONVERSATION
+
+User:
+السلام عليكم
+
+Result:
+CASUAL_CONVERSATION
+
+IMPORTANT:
+
+Do NOT classify something as casual if it contains an actual request.
+
+For example:
+
+User:
+كيف احجز دكتور؟
+
+Result:
+SEARCH_QUERY: كيف يمكن حجز موعد مع طبيب؟
+
+User:
+كيف أعرف أسعاركم؟
+
+Result:
+SEARCH_QUERY: ما هي أسعار الخدمات؟
+
+User:
+كيف حال الطبيب؟
+
+Result:
+SEARCH_QUERY: كيف هي حالة الطبيب؟
+
+User:
+السلام عليكم، ابغى دكتور جلدية
+
+Result:
+SEARCH_QUERY: أريد حجز استشارة في تخصص الجلدية.
+
+==================================================
+SEARCH QUERY
+==================================================
+
+For real questions:
+
+- Preserve the exact meaning and intent.
+- Convert Saudi/Gulf colloquial Arabic into clear Arabic.
+- Normalize spelling mistakes and dialect variations.
+- Do not add facts that were not mentioned.
+- Do not invent services, doctors, prices, locations, or entities.
+- Keep important names, services, specialties, products, and entities.
+- Do not make the query more specific than the original.
+- Make short ambiguous questions clearer only when the intent is obvious.
+- Return one short search query.
+- Do NOT answer the user's question.
 
 Examples:
 
 User:
 شو رقمكن؟
 
-Rewrite:
-ما هو رقم التواصل؟
+Result:
+SEARCH_QUERY: ما هو رقم التواصل؟
 
 User:
 وين موقعكم؟
 
-Rewrite:
-ما هو الموقع الإلكتروني لحكيم كير؟
+Result:
+SEARCH_QUERY: ما هو الموقع الإلكتروني لحكيم كير؟
 
 User:
 ايش ايميلكم؟
 
-Rewrite:
-ما هو البريد الإلكتروني لحكيم كير؟
+Result:
+SEARCH_QUERY: ما هو البريد الإلكتروني لحكيم كير؟
 
 User:
 عندكم دكتور مسالك؟
 
-Rewrite:
-هل تتوفر استشارة في تخصص المسالك البولية؟
+Result:
+SEARCH_QUERY: هل تتوفر استشارة في تخصص المسالك البولية؟
 
 User:
 ابغى احجز دكتور
 
-Rewrite:
-أرغب في حجز موعد مع طبيب.
+Result:
+SEARCH_QUERY: أرغب في حجز موعد مع طبيب.
 
 User:
 كم سعر قراءة التحاليل؟
 
-Rewrite:
-كم سعر قراءة نتائج التحاليل؟
+Result:
+SEARCH_QUERY: كم سعر قراءة نتائج التحاليل؟
 
 User:
 عندكم تحليل فيتامين د؟
 
-Rewrite:
-هل يتوفر تحليل فيتامين د؟
+Result:
+SEARCH_QUERY: هل يتوفر تحليل فيتامين د؟
 
 User:
 ما وصلني رابط الموعد
 
-Rewrite:
-لم يصلني رابط موعد الطبيب.
+Result:
+SEARCH_QUERY: لم يصلني رابط موعد الطبيب.
 
 User:
 كيف اقدر اسأل دكتور؟
 
-Rewrite:
-كيف يمكن استخدام خدمة اسأل طبيب؟
+Result:
+SEARCH_QUERY: كيف يمكن استخدام خدمة اسأل طبيب؟
 
 User:
 وش الخدمات اللي عندكم؟
 
-Rewrite:
-ما هي الخدمات التي تقدمها حكيم كير؟
+Result:
+SEARCH_QUERY: ما هي الخدمات التي تقدمها حكيم كير؟
 
 User:
 هل عندكم زيارة منزلية؟
 
-Rewrite:
-هل تتوفر خدمة الزيارة المنزلية؟
+Result:
+SEARCH_QUERY: هل تتوفر خدمة الزيارة المنزلية؟
 
 User:
 ابغى اعرف عن المختبر
 
-Rewrite:
-أرغب في معرفة معلومات عن خدمات المختبر.
+Result:
+SEARCH_QUERY: أرغب في معرفة معلومات عن خدمات المختبر.
 
 User question:
 {question}
@@ -127,18 +251,85 @@ User question:
         ],
     )
 
-    for block in response.content:
-        if getattr(block, "type", None) == "text" and block.text:
-            rewritten = block.text.strip()
+    result = _extract_text(response)
 
-            if rewritten:
-                return rewritten
+    if not result:
+        # Safe fallback:
+        # If Claude cannot rewrite the query, retrieve using the original.
+        return question
 
-    return question
+    result = result.strip()
+
+    if result == "CASUAL_CONVERSATION":
+        return "__CASUAL_CONVERSATION__"
+
+    if result.startswith("SEARCH_QUERY:"):
+        result = result[len("SEARCH_QUERY:"):].strip()
+
+    return result or question
+
+
+def generate_casual_answer(question: str):
+    """
+    Answer simple conversational messages directly.
+    No knowledge retrieval is required.
+    """
+
+    prompt = f"""
+You are a friendly and natural customer support assistant for Hakeem Care.
+
+The user's message is casual conversation only.
+
+Respond naturally and briefly.
+
+Rules:
+- Use the same language as the user.
+- Match the user's tone.
+- Be friendly and polite.
+- Do not invent Hakeem Care information.
+- Do not mention RAG, context, knowledge base, embeddings, or retrieval.
+- Do not turn a casual message into a business answer.
+- If appropriate, naturally invite the user to ask their question.
+
+Examples:
+
+User:
+كيفك؟
+
+Response:
+بخير الحمد لله 🌷 كيف أقدر أساعدك؟
+
+User:
+كيف اخبارك؟
+
+Response:
+بخير ولله الحمد 🌷 وأنت كيفك؟
+
+User:
+يعطيكم العافية
+
+Response:
+الله يعافيك 🌷 حياك الله.
+
+User:
+شكراً
+
+Response:
+العفو، حياك الله 🌷
+
+User:
+السلام عليكم
+
+Response:
+وعليكم السلام ورحمة الله وبركاته 🌷 حياك الله.
+
+User:
+{question}
+"""
 
     response = client.messages.create(
         model="claude-sonnet-5-5",
-        max_tokens=80,
+        max_tokens=100,
         messages=[
             {
                 "role": "user",
@@ -147,13 +338,12 @@ User question:
         ],
     )
 
-    for block in response.content:
-        if getattr(block, "type", None) == "text" and block.text:
-            return block.text.strip()
+    result = _extract_text(response)
 
-    # Fallback:
-    # If Claude doesn't return a text block, keep the original query.
-    return question
+    if result:
+        return result
+
+    return "حياك الله 🌷 كيف أقدر أساعدك؟"
 
 
 def generate_answer(question: str, context: str):
@@ -302,11 +492,12 @@ User question:
         ],
     )
 
-    for block in response.content:
-        if getattr(block, "type", None) == "text" and block.text:
-            return block.text
+    result = _extract_text(response)
 
-    raise RuntimeError("Claude did not return a text response")
+    if result:
+        return result
+
+    return "عذرًا، لم أتمكن من إعداد إجابة الآن."
 
 
 def check_context_relevance(
@@ -338,76 +529,6 @@ Return ANSWERABLE when the context contains:
 
 Return NOT_ANSWERABLE ONLY when the context contains no useful
 information that can answer the user's question.
-
-Examples:
-
-Context:
-The official website is:
-
-https://hakeemcare.com
-
-Question:
-ما هو موقع حكيم كير؟
-
-Result:
-ANSWERABLE
-
-
-Context:
-The website is www.hakeemcare.com.
-
-Patients can access Hakeem Care through the website or application.
-
-Question:
-ايش موقع حكيم كير؟
-
-Result:
-ANSWERABLE
-
-
-Context:
-Vitamin D test: 99 SAR.
-
-Comprehensive package: 349 SAR.
-
-Lab prices vary by test.
-
-Question:
-كم اسعار التحاليل؟
-
-Result:
-ANSWERABLE
-
-
-Context:
-Laboratory result interpretation costs 15 SAR.
-
-Question:
-كم سعر قراءة التحاليل؟
-
-Result:
-ANSWERABLE
-
-
-Context:
-Patients can book doctors remotely through online consultations.
-
-Question:
-كيف أحجز دكتور؟
-
-Result:
-ANSWERABLE
-
-
-Context:
-The company provides healthcare services.
-
-Question:
-كم سعر طبيب القلب غدًا الساعة 8؟
-
-Result:
-NOT_ANSWERABLE
-
 
 IMPORTANT BUSINESS CONTEXT:
 
@@ -452,15 +573,16 @@ User question:
         ],
     )
 
-    for block in response.content:
-        if getattr(block, "type", None) == "text" and block.text:
-            result = block.text.strip().upper()
+    result = _extract_text(response)
 
-            if result in {
-                "ANSWERABLE",
-                "NOT_ANSWERABLE",
-            }:
-                return result
+    if result:
+        result = result.strip().upper()
+
+        if result in {
+            "ANSWERABLE",
+            "NOT_ANSWERABLE",
+        }:
+            return result
 
     return "NOT_ANSWERABLE"
 
@@ -553,14 +675,15 @@ User question:
         ],
     )
 
-    for block in response.content:
-        if getattr(block, "type", None) == "text" and block.text:
-            result = block.text.strip().upper()
+    result = _extract_text(response)
 
-            if result in {
-                "RELATED_BUT_UNKNOWN",
-                "OUT_OF_SCOPE",
-            }:
-                return result
+    if result:
+        result = result.strip().upper()
+
+        if result in {
+            "RELATED_BUT_UNKNOWN",
+            "OUT_OF_SCOPE",
+        }:
+            return result
 
     return "OUT_OF_SCOPE"
