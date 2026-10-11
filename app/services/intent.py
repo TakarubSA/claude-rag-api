@@ -22,29 +22,7 @@ client = anthropic.Anthropic(
 )
 
 
-# Greetings that should never trigger a handoff on their own.
-GREETINGS = {
-    "سلام",
-    "السلام عليكم",
-    "السلام عليكم ورحمة الله",
-    "السلام عليكم ورحمة الله وبركاته",
-    "هلا",
-    "هلا والله",
-    "مرحبا",
-    "مرحباً",
-    "مرحبا بك",
-    "أهلا",
-    "أهلاً",
-    "اهلا",
-    "اهلاً",
-    "صباح الخير",
-    "مساء الخير",
-    "مساء النور",
-    "صباح النور",
-    "hi",
-    "hello",
-    "hey",
-}
+VALID_INTENTS = {"reply", "api", "handoff"}
 
 
 def classify_intent(
@@ -52,18 +30,15 @@ def classify_intent(
     conversation_context: str = "",
 ) -> str:
     """
-    Classify the user's latest message.
+    Classify the user's current intent using the message and context.
 
     Valid actions:
     - reply
     - api
     - handoff
 
-    Conversation context is used to recognize answers to
-    previous clarification questions and human handoff workflows.
-
-    A standalone greeting always returns reply, regardless
-    of previous conversation history.
+    The classifier considers conversation history but does not
+    automatically carry an old handoff decision into new messages.
     """
 
     message = (message or "").strip()
@@ -75,132 +50,175 @@ def classify_intent(
     if not message:
         return "reply"
 
-    # Normalize whitespace and common Arabic character variants.
-    normalized_message = " ".join(message.lower().split())
-
-    # Standalone greeting must not trigger a handoff because
-    # an earlier message in the conversation mentioned an agent.
-    if normalized_message in GREETINGS:
-        logger.info(
-            "Intent shortcut: standalone greeting -> reply"
-        )
-        return "reply"
-
     prompt = f"""
 You are an intent classifier for a multi-tenant customer-support system.
 
-Classify the user's latest message into exactly ONE action:
+Your task is to identify the user's CURRENT intent using the latest
+message and relevant conversation history.
 
+Return exactly one action:
 reply
 api
 handoff
 
-Use the recent conversation to understand what the user is doing now.
-Consider the conversation history when it is relevant, but classify
-the user's latest message according to its actual meaning.
+IMPORTANT PRINCIPLES
+
+1. Classify what the user wants NOW, not what they wanted earlier.
+2. Use conversation history to understand meaning and references.
+3. Do not assume an old request or handoff is still active merely
+   because it appears in the conversation history.
+4. Do not classify based only on individual keywords.
+5. Understand Arabic, Saudi Arabic dialect, English, and mixed-language
+   messages according to their meaning and context.
+6. If there is insufficient evidence for a handoff, choose reply,
+   unless the user clearly requests an external operation, in which
+   case choose api.
 
 RECENT CONVERSATION:
-{conversation_context or "(no conversation history supplied)"}
+<conversation>
+{conversation_context or "(No conversation history supplied)"}
+</conversation>
 
 LATEST USER MESSAGE:
+<latest_message>
 {message}
+</latest_message>
 
 ACTION DEFINITIONS
 
 reply:
-Use when the user asks a general question that can be answered from
-the business knowledge base, greets the assistant, or provides an answer
-to an ordinary clarification question so the assistant can continue
-answering the user's question.
+Choose reply when the user is having a normal conversation, asking
+a general question, greeting the assistant, answering an ordinary
+clarification question, thanking the assistant, or changing the topic.
 
 Examples:
+- سلام
+- السلام عليكم
+- هلا والله
+- كيف حالك؟
+- مين أنتم؟
 - كيف أحجز موعد؟
-- ما طرق الدفع؟
-- وين موقع العيادة؟
-- هل هو دكتور مختص؟
-- The assistant asks which city the user means, and the user says Riyadh.
-- The user says سلام, مرحبا, هلا, or hello without another request.
+- وين موقعكم؟
+- شكراً
+- The assistant asks which city the user means, and the user answers.
+- The user previously discussed customer support but now asks a
+  general question unrelated to that request.
+
+These examples illustrate intent, not a fixed keyword list.
+Determine the meaning of the actual message.
 
 api:
-Use when the user asks the system to perform an operation or retrieve
-live, specific, external information, and no handoff rule applies.
+Choose api when the user requests an operation or live/external
+information that the system should retrieve or perform.
 
 Examples:
-- Check the status of order 12345.
-- هل الطلب 12345 تم شحنه؟
-- شيك على موعدي.
+- Check the status of my order.
+- شيك على حالة طلبي.
+- هل عندي موعد بكرة؟
+- أبغى أتابع الشحنة.
+- Retrieve a specific booking or transaction status.
+
+Choose api only when the requested operation is appropriate for
+an external API and no applicable mandatory handoff rule overrides it.
 
 handoff:
-Use when either of these conditions is met:
+Choose handoff only when there is clear evidence that human support
+should take over NOW.
 
-1. The user explicitly or implicitly asks to speak with a human employee,
-   support agent, customer service representative, or specialist.
+Valid reasons:
 
-2. The recent conversation shows that the assistant specifically asked
-   the user to provide information needed for a human team to handle,
-   complete, investigate, issue, or follow up on a request, and the latest
-   user message supplies the requested information sufficiently to proceed.
+A. EXPLICIT HUMAN REQUEST
 
-For condition 2:
-- Check the previous assistant messages, not only the latest message.
-- The user may send details on one line or across multiple lines.
-- Details may be in Arabic or English.
-- Arabic-Indic digits and English digits both count.
-- The fields can be given in any order.
-- Do not ask for the same details again once they have been provided.
-- Do not use handoff merely because the user gives a name, age, number,
-  or other information.
-- A simple answer to a normal clarification question is not handoff unless
-  the prior context indicates that the information is for a human follow-up
-  or a transfer workflow.
-- Do not classify a standalone greeting as handoff merely because
-  an earlier conversation mentioned an agent or human support.
-- A previous handoff request does not automatically make every later
-  message a handoff.
+The latest message clearly asks to speak with, contact, or be
+transferred to a human employee, support agent, or specialist.
 
-Examples:
+B. ACTIVE HUMAN-SUPPORT WORKFLOW
 
-Context:
-Assistant: Please provide your name, age, and test name so customer
-service can complete your request.
-Latest user message:
-عمار
-٢٨ سنة
-تحليل البول
-Action: handoff
+The recent conversation establishes that the assistant requested
+specific information to complete or investigate a human-support request.
 
-Context:
-Assistant: Send your order number so our support team can investigate.
-Latest user message:
-Order 12345
-Action: handoff
+The latest user message provides the requested information or clearly
+confirms the next step, and that information is sufficient to proceed.
 
-Context:
-Assistant: Which city are you asking about?
-Latest user message:
-Riyadh
+For condition B, verify all of the following:
+- The previous assistant message was specifically about human support.
+- The request has not already been completed or become irrelevant.
+- The latest user message responds meaningfully to that request.
+- The latest message provides the required information or confirmation.
+
+CONTEXT RULES
+
+- A previous mention of an employee does not itself justify handoff.
+- A previous handoff decision does not automatically apply to the next turn.
+- A greeting does not become a handoff because an employee was mentioned
+  earlier in the conversation.
+- A new question must be classified according to its current meaning.
+- An answer to an ordinary clarification question is reply.
+- Providing a name, age, phone number, or other detail is not sufficient
+  for handoff unless the active conversation establishes why that detail
+  was requested.
+- If the user supplies information requested for an active human-support
+  workflow, do not ask them to repeat information already supplied.
+- If the user explicitly requests a human now, choose handoff even if
+  the conversation previously discussed another topic.
+- Do not invent a human-support workflow that is not supported by context.
+- Do not confuse an assistant's suggestion to contact support with the
+  user's actual decision to proceed.
+- If the latest message is ambiguous and there is no clear evidence that
+  a transfer should happen now, prefer reply.
+
+EXAMPLES
+
+Example 1:
+Earlier conversation: The user asked to speak to customer support.
+Latest user message: سلام
 Action: reply
 
-Context:
-Assistant: Would you like to talk to a human agent?
-Latest user message:
-Yes, please.
-Action: handoff
-
-Context:
-Earlier conversation discussed contacting customer support.
-Latest user message:
-سلام
+Example 2:
+Earlier conversation: The assistant discussed an employee.
+Latest user message: كيف أحجز موعد؟
 Action: reply
 
-PRIORITY:
-1. Standalone greeting -> reply.
-2. Explicit request for a human agent -> handoff.
-3. Requested information for human handling is sufficiently supplied -> handoff.
-4. Live/external operation -> api.
-5. Otherwise -> reply.
+Example 3:
+Assistant: Please provide your name so our support team can investigate.
+User: Ammar
+Action: handoff
 
-Return only one word:
+Example 4:
+Assistant: Which city do you mean?
+User: Jeddah
+Action: reply
+
+Example 5:
+User: أبغى أكلم موظف
+Action: handoff
+
+Example 6:
+Assistant: Would you like me to connect you with a human agent?
+User: لا، عندي سؤال ثاني
+Action: reply
+
+Example 7:
+Earlier conversation: A support request was completed.
+Latest user message: شكراً
+Action: reply
+
+Example 8:
+User: شيك على حالة الطلب رقم 12345
+Action: api
+
+PRIORITY
+
+1. Clear, explicit request for a human now -> handoff.
+2. Clear response to an active human-support workflow -> handoff.
+3. External operation or live information request -> api,
+   unless a mandatory handoff rule applies.
+4. Otherwise -> reply.
+
+The conversation history provides context; it does not override the
+actual meaning of the latest message without a relevant reason.
+
+Return exactly one word:
 reply
 api
 handoff
@@ -218,28 +236,34 @@ handoff
             ],
         )
 
-        for block in response.content:
-            if getattr(block, "type", None) != "text":
-                continue
+        response_text = "".join(
+            block.text
+            for block in response.content
+            if getattr(block, "type", None) == "text"
+        ).strip().lower()
 
-            result = (block.text or "").strip().lower()
+        # Accept a valid action if Claude adds simple punctuation
+        # or formatting around the answer.
+        normalized_result = (
+            response_text
+            .replace("`", "")
+            .strip()
+            .rstrip(" .!:\n")
+        )
 
-            # Accept a valid action even if the model adds punctuation
-            # or wraps it in simple formatting.
-            result = result.replace("`", "").strip()
-            result = result.rstrip(" .!:\n")
-
-            if result in {"reply", "api", "handoff"}:
-                return result
-
-            # If Claude returns an unexpected response, fail safely.
-            logger.warning(
-                "Unexpected intent classification: %r",
-                result,
+        if normalized_result in VALID_INTENTS:
+            logger.info(
+                "Intent classified: intent=%s",
+                normalized_result,
             )
-            return "reply"
+            return normalized_result
 
-        logger.warning("Intent classifier returned no text.")
+        # Fail safely if the model returns an unexpected response.
+        # Do not accidentally trigger a handoff from malformed output.
+        logger.warning(
+            "Unexpected intent classification: %r",
+            response_text,
+        )
         return "reply"
 
     except Exception:
