@@ -22,6 +22,31 @@ client = anthropic.Anthropic(
 )
 
 
+# Greetings that should never trigger a handoff on their own.
+GREETINGS = {
+    "سلام",
+    "السلام عليكم",
+    "السلام عليكم ورحمة الله",
+    "السلام عليكم ورحمة الله وبركاته",
+    "هلا",
+    "هلا والله",
+    "مرحبا",
+    "مرحباً",
+    "مرحبا بك",
+    "أهلا",
+    "أهلاً",
+    "اهلا",
+    "اهلاً",
+    "صباح الخير",
+    "مساء الخير",
+    "مساء النور",
+    "صباح النور",
+    "hi",
+    "hello",
+    "hey",
+}
+
+
 def classify_intent(
     message: str,
     conversation_context: str = "",
@@ -34,15 +59,31 @@ def classify_intent(
     - api
     - handoff
 
-    The conversation context is required for reliable recognition
-    of answers to information requests from previous messages.
+    Conversation context is used to recognize answers to
+    previous clarification questions and human handoff workflows.
+
+    A standalone greeting always returns reply, regardless
+    of previous conversation history.
     """
+
     message = (message or "").strip()
+
     conversation_context = (
         conversation_context or ""
     ).strip()[-8000:]
 
     if not message:
+        return "reply"
+
+    # Normalize whitespace and common Arabic character variants.
+    normalized_message = " ".join(message.lower().split())
+
+    # Standalone greeting must not trigger a handoff because
+    # an earlier message in the conversation mentioned an agent.
+    if normalized_message in GREETINGS:
+        logger.info(
+            "Intent shortcut: standalone greeting -> reply"
+        )
         return "reply"
 
     prompt = f"""
@@ -55,7 +96,8 @@ api
 handoff
 
 Use the recent conversation to understand what the user is doing now.
-Do not classify the latest message in isolation when history is available.
+Consider the conversation history when it is relevant, but classify
+the user's latest message according to its actual meaning.
 
 RECENT CONVERSATION:
 {conversation_context or "(no conversation history supplied)"}
@@ -77,6 +119,7 @@ Examples:
 - وين موقع العيادة؟
 - هل هو دكتور مختص؟
 - The assistant asks which city the user means, and the user says Riyadh.
+- The user says سلام, مرحبا, هلا, or hello without another request.
 
 api:
 Use when the user asks the system to perform an operation or retrieve
@@ -110,6 +153,10 @@ For condition 2:
 - A simple answer to a normal clarification question is not handoff unless
   the prior context indicates that the information is for a human follow-up
   or a transfer workflow.
+- Do not classify a standalone greeting as handoff merely because
+  an earlier conversation mentioned an agent or human support.
+- A previous handoff request does not automatically make every later
+  message a handoff.
 
 Examples:
 
@@ -140,11 +187,18 @@ Latest user message:
 Yes, please.
 Action: handoff
 
+Context:
+Earlier conversation discussed contacting customer support.
+Latest user message:
+سلام
+Action: reply
+
 PRIORITY:
-1. Explicit request for a human agent -> handoff.
-2. Requested information for human handling is sufficiently supplied -> handoff.
-3. Live/external operation -> api.
-4. Otherwise -> reply.
+1. Standalone greeting -> reply.
+2. Explicit request for a human agent -> handoff.
+3. Requested information for human handling is sufficiently supplied -> handoff.
+4. Live/external operation -> api.
+5. Otherwise -> reply.
 
 Return only one word:
 reply
@@ -178,6 +232,7 @@ handoff
             if result in {"reply", "api", "handoff"}:
                 return result
 
+            # If Claude returns an unexpected response, fail safely.
             logger.warning(
                 "Unexpected intent classification: %r",
                 result,
