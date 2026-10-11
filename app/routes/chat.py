@@ -300,6 +300,7 @@ def make_response(
 @router.post("/chat")
 def chat(
     request: ChatRequest,
+    http_request: Request,
     authorization: str | None = Header(default=None),
 ):
     logger.info("HEADERS: %s", {k: v for k, v in http_request.headers.items() if k.lower() != "authorization"})
