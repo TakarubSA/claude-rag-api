@@ -212,73 +212,95 @@ def classify_intent(
 
     # Rule 2: Classify all other intents using Claude.
     prompt = f"""
-Classify the user's message into exactly ONE of these actions:
+Classify the user's latest message into exactly ONE action:
 
 reply
 api
 handoff
 
-Definitions:
+You will receive:
+- Recent conversation context, which may include previous bot messages.
+- The user's latest message.
+
+IMPORTANT GENERAL HANDOFF RULE:
+
+If the previous conversation shows that the assistant asked the
+user to provide specific information, details, documents, or answers,
+and the latest user message appears to provide the requested
+information, classify the latest message as:
+
+handoff
+
+This rule applies to ALL clients and ALL business domains.
+Do not hardcode any particular client, company, service, or laboratory.
+
+Examples:
+
+Previous assistant message:
+"Please provide your full name, age, and test name."
+
+Latest user message:
+"Ammar, 28 years old, blood test."
+
+Action:
+handoff
+
+Previous assistant message:
+"Please send your order number so our team can investigate."
+
+Latest user message:
+"Order 12345."
+
+Action:
+handoff
+
+Previous assistant message:
+"Please provide your name and phone number so customer service
+can follow up."
+
+Latest user message:
+"My name is Ahmed, my phone number is ..."
+
+Action:
+handoff
+
+The latest user message may contain the requested information
+on one line, across multiple lines, or in a different order.
+Understand Arabic and English, including Arabic-Indic digits.
+
+Do not ask for the information again once the user has provided it.
+Do not classify a message as handoff merely because it contains
+a name, number, or other information. The conversation context
+must show that the assistant previously requested that information,
+unless the user independently requests a human agent.
+
+Other classifications:
 
 reply:
-Use this when the user is asking for general information that can be
-answered using the knowledge base, or when the user is greeting
-or starting a conversation.
-
-Examples:
-- كيف أحجز موعد؟
-- ايش طرق الدفع؟
-- وين موقع العيادة؟
-- هل أقدر أغير موعدي؟
-- السلام عليكم
-- مرحبا
-- صباح الخير
-- كيف حالك؟
+General questions answerable using the knowledge base, greetings,
+and ordinary conversation. Also use reply when the assistant needs
+to ask the user for missing information.
 
 api:
-Use this when the user wants the system to perform an operation,
-check live data, retrieve specific information, or interact with
-an external system/API.
-
-IMPORTANT:
-A request for specific live information may be api even if it is phrased
-as a question, unless it is a laboratory booking-number request that
-must be routed to a human agent.
-
-Examples:
-- هل رحلتي 12345 صار فيها نداء؟
-- شيك على رحلتي 12345
-- وين طلبي 98765؟
-- شيك على موعدي 4567
-- هل الطلب 12345 تم شحنه؟
-- ابحث عن فاتورتي 12345
+Requests requiring an external API or live data retrieval,
+unless one of the handoff rules above applies.
 
 handoff:
-Use this when the user explicitly or implicitly wants to speak
-with a real human agent, customer service representative,
+The user explicitly requests a human agent, customer service,
 employee, or specialist.
 
-Examples:
-- أبغى أكلم موظف
-- أريد التحدث مع موظف
-- حولني لموظف
-- أبغى خدمة العملاء
-- ممكن أكلم شخص حقيقي؟
-- أريد التحدث مع شخص
-- احتاج موظف يساعدني
-- حولني لأحد الموظفين
-- أبغى أكلم الدعم
-- ما أبغى أكمل مع البوت
-
 Priority rules:
-1. Explicit or implicit request for a human agent -> handoff.
-2. Requests for live or external data -> api.
-3. Otherwise -> reply.
+
+1. User has provided information requested by the assistant
+   in the previous conversation -> handoff.
+2. User explicitly or implicitly requests a human agent -> handoff.
+3. User asks for live data or an external operation -> api.
+4. Otherwise -> reply.
 
 Recent conversation context:
-{conversation_context or "(none supplied)"}
+{conversation_context or "(no previous conversation context provided)"}
 
-Current user message:
+Latest user message:
 {message}
 
 Return ONLY one of:
