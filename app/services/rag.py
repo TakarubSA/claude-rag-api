@@ -49,6 +49,79 @@ def _clean_text(text: str) -> str:
     return text.strip()
 
 
+def _is_short_confirmation(message: str) -> bool:
+    """Recognize standalone acknowledgements that need conversation context."""
+    value = _clean_text(message).casefold().strip(" .!?؟،؛\"'“”‘’")
+    # Normalize common Arabic spelling variants without changing full queries.
+    value = value.translate(str.maketrans({"أ": "ا", "إ": "ا", "آ": "ا", "ى": "ي"}))
+    confirmations = {
+        "ايوا", "ايوه", "ايوة", "ايوه", "اي", "اه", "اها", "نعم", "اجل",
+        "تمام", "اكيد", "أكيد", "صح", "بالضبط", "موافق", "موافقه",
+        "yes", "yeah", "yep", "yup", "ok", "okay", "sure", "correct",
+    }
+    return value in confirmations
+
+
+def _latest_assistant_message(history: str) -> str:
+    """Return the most recent assistant turn from normalized chat history."""
+    if not history:
+        return ""
+
+    assistant_messages = []
+    current_role = None
+    current_parts = []
+
+    def flush():
+        if current_role == "assistant" and current_parts:
+            assistant_messages.append(" ".join(current_parts).strip())
+
+    for raw_line in history.splitlines():
+        line = raw_line.strip()
+        match = re.match(r"^(assistant|user|system|bot|ai|human|customer)\s*:\s*(.*)$", line, re.I)
+        if match:
+            flush()
+            role = match.group(1).lower()
+            current_role = "assistant" if role in {"assistant", "bot", "ai"} else role
+            current_parts = [match.group(2).strip()] if match.group(2).strip() else []
+        elif current_role and line:
+            current_parts.append(line)
+
+    flush()
+    return assistant_messages[-1] if assistant_messages else ""
+
+
+
+def _latest_user_message(history: str) -> str:
+    """Return the most recent user turn from role-labelled conversation history."""
+    if not history:
+        return ""
+
+    user_messages = []
+    current_role = None
+    current_parts = []
+
+    def flush():
+        if current_role == "user" and current_parts:
+            user_messages.append(" ".join(current_parts).strip())
+
+    for raw_line in history.splitlines():
+        line = raw_line.strip()
+        match = re.match(
+            r"^(assistant|user|system|bot|ai|human|customer|contact|agent)\s*:\s*(.*)$",
+            line,
+            re.I,
+        )
+        if match:
+            flush()
+            role = match.group(1).lower()
+            current_role = "user" if role in {"user", "human", "customer", "contact"} else role
+            current_parts = [match.group(2).strip()] if match.group(2).strip() else []
+        elif current_role and line:
+            current_parts.append(line)
+
+    flush()
+    return user_messages[-1] if user_messages else ""
+
 def _clean_answer_format(answer: str) -> str:
     """Clean formatting and hide internal RAG terminology from customer-facing answers."""
     answer = (answer or "").strip()
@@ -324,7 +397,25 @@ def answer_question(
     print("ORIGINAL QUERY:", cleaned_question)
     print("SEARCH QUERY:", search_query)
 
-    # Handle ordinary casual conversation.
+    # Keep retrieval context-aware even when the rewriter misses a reference.
+    # Search terms are generated from the previous user turn + previous assistant
+    # turn + current message, so follow-ups such as "كم سعره؟", "وين موقعكم؟",
+    # or "طيب كيف أحجز؟" retain the topic without hardcoding specific phrases.
+    previous_user = _latest_user_message(history)
+    previous_assistant = _latest_assistant_message(history)
+    contextual_retrieval_query = " ".join(
+        part for part in (previous_user, previous_assistant, cleaned_question) if part
+    ).strip()
+
+    # If the rewriter mistakenly labels a contextual confirmation as casual,
+    # do not discard the business context. Use the recent exchange for retrieval.
+    if search_query == CASUAL_MARKER and _is_short_confirmation(cleaned_question):
+        if previous_user or previous_assistant:
+            print("CONTEXTUAL REPLY FALLBACK: using recent exchange for retrieval")
+            search_query = contextual_retrieval_query or previous_assistant or previous_user
+
+    # Handle ordinary casual conversation only when it is not a contextual
+    # short confirmation (or no preceding assistant turn is available).
     if search_query == CASUAL_MARKER:
         casual_answer = generate_casual_answer(
             cleaned_question,
@@ -345,9 +436,18 @@ def answer_question(
     # rewriter may accidentally replace (for example, SIBO / "سيبو").
     texts = [search_query]
 
+    # Always add a contextual retrieval candidate when there is a previous turn.
+    # The direct query remains in the list, so a clearly new topic can still win;
+    # tenant isolation is preserved by _search_many(client_id).
+    if contextual_retrieval_query and contextual_retrieval_query.casefold() not in {
+        search_query.casefold(), cleaned_question.casefold()
+    }:
+        texts.append(contextual_retrieval_query)
+
     if (
         cleaned_question
         and cleaned_question.casefold() != search_query.casefold()
+        and cleaned_question.casefold() not in {item.casefold() for item in texts}
     ):
         texts.append(cleaned_question)
 
