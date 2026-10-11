@@ -1,24 +1,25 @@
-import os
-import time
+from functools import lru_cache
 
-import voyageai
-from dotenv import load_dotenv
+from sentence_transformers import SentenceTransformer
 
-load_dotenv()
 
-client = voyageai.Client(
-    api_key=os.getenv("VOYAGE_API_KEY")
-)
+MODEL_NAME = "intfloat/multilingual-e5-large"
+
+
+@lru_cache(maxsize=1)
+def get_model() -> SentenceTransformer:
+    return SentenceTransformer(
+        MODEL_NAME,
+        device="cpu",
+    )
 
 
 def create_embedding(text: str):
-    result = client.embed(
+    embeddings = create_embeddings(
         [text],
-        model="voyage-4",
         input_type="query",
     )
-
-    return result.embeddings[0]
+    return embeddings[0]
 
 
 def create_embeddings(
@@ -26,26 +27,24 @@ def create_embeddings(
     batch_size: int = 20,
     input_type: str = "document",
 ):
-    all_embeddings = []
+    if not texts:
+        return []
 
-    for i in range(0, len(texts), batch_size):
-        batch = texts[i:i + batch_size]
+    prefix = "query: " if input_type == "query" else "passage: "
 
-        print(
-            f"Embedding batch "
-            f"{i + 1}-{min(i + batch_size, len(texts))} "
-            f"of {len(texts)}"
-        )
+    prepared_texts = [
+        prefix + text.strip()
+        for text in texts
+    ]
 
-        result = client.embed(
-            batch,
-            model="voyage-4",
-            input_type=input_type,
-        )
+    model = get_model()
 
-        all_embeddings.extend(result.embeddings)
+    embeddings = model.encode(
+        prepared_texts,
+        batch_size=batch_size,
+        normalize_embeddings=True,
+        convert_to_numpy=True,
+        show_progress_bar=False,
+    )
 
-        if i + batch_size < len(texts):
-            time.sleep(21)
-
-    return all_embeddings
+    return embeddings.tolist()
