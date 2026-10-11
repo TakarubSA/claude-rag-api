@@ -33,7 +33,7 @@ NOISE_MARKERS = (
 # --------------------------------------------------
 # Text helpers
 # --------------------------------------------------
-
+STRONG_MATCH_DISTANCE = 0.6
 
 def _clean_text(text: str) -> str:
     text = (text or "").strip()
@@ -190,18 +190,20 @@ def _generate_grounded_answer(
     client_config: dict | None,
     best_distance=None,
     history: str = "",
+    skip_check: bool = False,
 ):
-    relevance = check_context_relevance(
-        question=question,
-        context=context,
-        client_config=client_config,
-        history=history,
-    )
+    if not skip_check:
+        relevance = check_context_relevance(
+            question=question,
+            context=context,
+            client_config=client_config,
+            history=history,
+        )
 
-    print("CONTEXT RELEVANCE:", relevance)
+        print("CONTEXT RELEVANCE:", relevance)
 
-    if relevance != "ANSWERABLE":
-        return None
+        if relevance != "ANSWERABLE":
+            return None
 
     answer = generate_answer(
         question=question,
@@ -323,14 +325,18 @@ def answer_question(
         default=None,
     )
 
-    # 3) The model decides: clear question / subject from history /
-    #    ask for the missing detail. Facts come only from the knowledge.
+    # 3) Strong retrieval match: skip the relevance gate and let
+    #    generate_answer decide (answer / use history / ask for the
+    #    missing detail). Weak match: keep the gate.
+    strong_match = best_distance is not None and best_distance <= STRONG_MATCH_DISTANCE
+
     grounded_result = _generate_grounded_answer(
         question=cleaned_question,
         context=knowledge_context,
         client_config=client_config,
         best_distance=best_distance,
         history=history,
+        skip_check=strong_match,
     )
 
     if grounded_result:
