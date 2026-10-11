@@ -238,10 +238,13 @@ def answer_question(
         print("RETRIEVAL UNAVAILABLE: continuing with client configuration.")
         result_lists = []
 
-    results = [
-        r for r in _merge(*result_lists)
-        if float(r.distance) <= MAX_DISTANCE
-    ]
+        results = [
+    r for r in _merge(*result_lists)
+    if (
+        float(r.distance) <= MAX_DISTANCE
+        or int(getattr(r, "keyword_hits", 0) or 0) > 0
+    )
+        ]
 
     if results:
         results = _rerank(search_query, results)
