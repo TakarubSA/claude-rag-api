@@ -253,19 +253,7 @@ def _generate_grounded_answer(
     best_distance=None,
     history: str = "",
 ):
-    """Answer only when retrieved knowledge/config supports the answer."""
-    relevance = check_context_relevance(
-        question=question,
-        context=context,
-        client_config=client_config,
-        history=history,
-    )
-
-    print("CONTEXT RELEVANCE:", relevance)
-
-    if relevance != "ANSWERABLE":
-        return None
-
+    """Let Claude answer from retrieved knowledge instead of pre-rejecting it."""
     answer = generate_answer(
         question=question,
         context=context,
@@ -274,10 +262,7 @@ def _generate_grounded_answer(
     )
 
     if not isinstance(answer, str) or not answer.strip():
-        print(
-            "GROUNDED ANSWER EMPTY: "
-            "falling back to knowledge-gap handling"
-        )
+        print("GROUNDED ANSWER EMPTY: falling back to knowledge-gap handling")
         return None
 
     return {
@@ -432,11 +417,8 @@ def answer_question(
         )
         return grounded_result
 
-    # Use the standalone rewritten query for gap classification so follow-ups
-    # such as "كم سعره؟" retain the subject resolved by Claude.
-    gap_question = search_query if search_query != CASUAL_MARKER else cleaned_question
     gap_type = classify_knowledge_gap(
-        question=gap_question,
+        question=cleaned_question,
         context=knowledge_context,
         client_config=client_config,
     )
@@ -444,7 +426,7 @@ def answer_question(
     print("KNOWLEDGE GAP:", gap_type)
 
     fallback = generate_fallback_answer(
-        question=gap_question,
+        question=cleaned_question,
         gap_type=gap_type,
         client_config=client_config,
     )
