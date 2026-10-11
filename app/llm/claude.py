@@ -30,12 +30,6 @@ CASUAL_MARKER = "__CASUAL_CONVERSATION__"
 # ----------------------------------------------------------------------
 
 def _normalize_client_config(client_config: dict | None) -> dict:
-    """
-    Normalize client configuration.
-
-    The RAG/LLM layer must never depend on a specific tenant.
-    Every tenant-specific behavior comes through this object.
-    """
     return client_config or {}
 
 
@@ -67,10 +61,6 @@ def _format_rules(
     rules,
     empty_message: str = "No additional rules provided.",
 ) -> str:
-    """
-    Convert JSON configuration arrays/strings into prompt-friendly text.
-    """
-
     if not rules:
         return empty_message
 
@@ -107,12 +97,6 @@ def _format_rules(
 
 
 def _build_client_profile(client_config: dict) -> str:
-    """
-    Build the tenant-specific profile injected into Claude.
-
-    This is configuration, not hardcoded business logic.
-    """
-
     name = _get_client_name(client_config)
 
     description = (
@@ -120,21 +104,10 @@ def _build_client_profile(client_config: dict) -> str:
         or "No company description provided."
     )
 
-    business_rules = _format_rules(
-        client_config.get("business_rules"),
-    )
-
-    booking_rules = _format_rules(
-        client_config.get("booking_rules"),
-    )
-
-    safety_rules = _format_rules(
-        client_config.get("safety_rules"),
-    )
-
-    response_rules = _format_rules(
-        client_config.get("response_rules"),
-    )
+    business_rules = _format_rules(client_config.get("business_rules"))
+    booking_rules = _format_rules(client_config.get("booking_rules"))
+    safety_rules = _format_rules(client_config.get("safety_rules"))
+    response_rules = _format_rules(client_config.get("response_rules"))
 
     website_url = _get_website_url(client_config)
 
@@ -175,13 +148,6 @@ Response rules:
 # ----------------------------------------------------------------------
 
 def _extract_text(response):
-    """
-    Extract the first text block from Claude.
-
-    Thinking/tool blocks are ignored.
-    The application only receives the final textual answer.
-    """
-
     for block in response.content:
         if (
             getattr(block, "type", None) == "text"
@@ -196,11 +162,7 @@ def _call_claude(
     prompt: str,
     max_tokens: int,
 ):
-    """
-    Central Claude API wrapper.
-
-    The wrapper never raises into the RAG pipeline.
-    """
+    """Central Claude API wrapper. Never raises into the RAG pipeline."""
 
     for attempt in range(2):
         budget = (
@@ -222,9 +184,7 @@ def _call_claude(
             )
 
         except Exception as e:
-            print(
-                f"[claude_service] API error: {e}"
-            )
+            print(f"[claude_service] API error: {e}")
             return None
 
         text = _extract_text(response)
@@ -234,8 +194,7 @@ def _call_claude(
 
         print(
             "[claude_service] no text block "
-            f"(stop_reason="
-            f"{getattr(response, 'stop_reason', None)}), "
+            f"(stop_reason={getattr(response, 'stop_reason', None)}), "
             "retrying"
         )
 
@@ -247,43 +206,32 @@ def _call_claude(
 # ----------------------------------------------------------------------
 
 def _is_arabic(text: str) -> bool:
-    return bool(
-        re.search(
-            r"[\u0600-\u06FF]",
-            text or "",
-        )
-    )
+    return bool(re.search(r"[\u0600-\u06FF]", text or ""))
 
 
 def _light_clean(text: str) -> str:
-    """
-    Lightweight normalization before sending text to Claude.
-    """
-
     text = (text or "").strip()
-
-    # Remove Arabic diacritics and tatweel.
-    text = re.sub(
-        r"[\u064B-\u0652\u0640]",
-        "",
-        text,
-    )
-
-    # هلااااا -> هلاا
-    text = re.sub(
-        r"(.)\1{2,}",
-        r"\1\1",
-        text,
-    )
-
-    # Collapse whitespace.
-    text = re.sub(
-        r"\s+",
-        " ",
-        text,
-    )
-
+    text = re.sub(r"[\u064B-\u0652\u0640]", "", text)
+    text = re.sub(r"(.)\1{2,}", r"\1\1", text)
+    text = re.sub(r"\s+", " ", text)
     return text
+
+
+def _history_block(history: str, title: str, note: str) -> str:
+    history = (history or "").strip()[-4000:]
+
+    if not history:
+        return ""
+
+    return f"""
+==================================================
+{title}
+==================================================
+
+{note}
+
+{history}
+"""
 
 
 # ----------------------------------------------------------------------
@@ -296,40 +244,21 @@ def rewrite_query(
     history: str = "",
 ) -> str:
     """
-    Understand and rewrite the user's message for retrieval.
-
-    Responsibilities:
-    - typo correction
-    - dialect normalization
-    - intent preservation
-    - resolving references using conversation history
-    - casual conversation detection
-    - retrieval-friendly phrasing
-
+    Rewrite the user's message into a retrieval query.
+    Uses conversation history only to resolve references.
     It must NEVER answer the user's question.
     """
 
-    config = _normalize_client_config(
-        client_config
-    )
-
+    config = _normalize_client_config(client_config)
     cleaned = _light_clean(question)
+    client_profile = _build_client_profile(config)
 
-    client_profile = _build_client_profile(
-        config
-    )
-
-    history = (history or "").strip()[-4000:]
-
-    history_block = (
-        f"""
-==================================================
-CONVERSATION HISTORY
-==================================================
-
-Use the history ONLY to resolve references in the user message
+    history_block = _history_block(
+        history,
+        "CONVERSATION HISTORY",
+        """Use the history ONLY to resolve references in the user message
 (pronouns, omitted subjects, "how much", "is he a specialist",
-"هو", "كم سعره").
+"هو", "كم سعره", "كم سعرها").
 
 - Replace the reference with the exact name/service/entity from
   the history. This is the one case where you SHOULD make the
@@ -340,11 +269,8 @@ Use the history ONLY to resolve references in the user message
   is NOT casual conversation.
 - Copy names and terms exactly as written in the history.
 - Do not invent anything that is not in the history.
-
-{history}
-"""
-        if history
-        else ""
+- If the history does not identify the reference, keep the message
+  as it is. Do not guess.""",
     )
 
     prompt = f"""
@@ -532,24 +458,17 @@ USER MESSAGE
 {cleaned}
 """
 
-    result = _call_claude(
-        prompt,
-        max_tokens=150,
-    )
+    result = _call_claude(prompt, max_tokens=150)
 
     if not result:
         return cleaned or question
 
     result = result.strip()
 
-    if result.upper().startswith(
-        "CASUAL_CONVERSATION"
-    ):
+    if result.upper().startswith("CASUAL_CONVERSATION"):
         return CASUAL_MARKER
 
-    if result.startswith(
-        "SEARCH_QUERY:"
-    ):
+    if result.startswith("SEARCH_QUERY:"):
         result = result[len("SEARCH_QUERY:"):].strip()
 
     return result or cleaned or question
@@ -563,23 +482,9 @@ def generate_casual_answer(
     question: str,
     client_config: dict | None = None,
 ):
-    """
-    Generate a short natural response for purely casual messages.
-
-    No knowledge retrieval is required.
-    """
-
-    config = _normalize_client_config(
-        client_config
-    )
-
-    client_name = _get_client_name(
-        config
-    )
-
-    description = _get_company_description(
-        config
-    )
+    config = _normalize_client_config(client_config)
+    client_name = _get_client_name(config)
+    description = _get_company_description(config)
 
     prompt = f"""
 You are a friendly customer-support assistant.
@@ -650,10 +555,7 @@ USER
 {_light_clean(question)}
 """
 
-    result = _call_claude(
-        prompt,
-        max_tokens=120,
-    )
+    result = _call_claude(prompt, max_tokens=120)
 
     if result:
         return result
@@ -669,33 +571,29 @@ def generate_answer(
     question: str,
     context: str,
     client_config: dict | None = None,
+    history: str = "",
 ):
     """
     Generate the final answer from retrieved knowledge.
-
-    The model performs internal evidence extraction and verification
-    before producing the final answer.
-
-    IMPORTANT:
-    The internal reasoning is NOT returned to the user.
+    History is used only to identify what the question refers to.
     """
 
-    config = _normalize_client_config(
-        client_config
-    )
-
-    client_profile = _build_client_profile(
-        config
-    )
-
-    website_url = _get_website_url(
-        config
-    )
+    config = _normalize_client_config(client_config)
+    client_profile = _build_client_profile(config)
+    website_url = _get_website_url(config)
 
     website_instruction = (
         website_url
         if website_url
         else "No official website is configured."
+    )
+
+    history_block = _history_block(
+        history,
+        "CONVERSATION HISTORY",
+        "Use this only to identify what the user's question refers to. "
+        "Facts must come from the retrieved knowledge, not from earlier "
+        "assistant messages.",
     )
 
     prompt = f"""
@@ -728,6 +626,20 @@ General world knowledge is NOT a source of business facts.
 
 Never invent a business fact because you know it from general
 knowledge.
+
+==================================================
+DECIDE FIRST
+==================================================
+
+Look at the user question and the conversation history (if any):
+
+1. The question is clear on its own -> answer from the knowledge.
+2. The question is unclear alone, but the history identifies what it
+   refers to -> use that subject and answer from the knowledge.
+3. The question is unclear and the history does not identify it ->
+   do not guess and do not list unrelated items. Use the knowledge to
+   say what the answer depends on (test name, city, service), then
+   ask for the missing detail in one short sentence.
 
 ==================================================
 INTERNAL REASONING PROCESS
@@ -863,11 +775,11 @@ RESPONSE QUALITY
 
 - Answer the actual question directly.
 - Do not repeat the user's question unnecessarily.
-- Do not ask unnecessary follow-up questions.
 - Keep the response concise but complete.
 - Use bullets when presenting multiple entities or options.
 - Include relevant prices when confirmed.
 - Include relevant URLs when confirmed.
+- Do not use Markdown bold or asterisks.
 - Do not dump unrelated context.
 - Do not mention the knowledge base.
 - Do not mention RAG.
@@ -875,7 +787,7 @@ RESPONSE QUALITY
 - Do not mention retrieval.
 - Do not mention Claude or the AI system.
 - Do not reveal internal reasoning.
-
+{history_block}
 ==================================================
 RETRIEVED KNOWLEDGE
 ==================================================
@@ -889,10 +801,7 @@ USER QUESTION
 {question}
 """
 
-    result = _call_claude(
-        prompt,
-        max_tokens=700,
-    )
+    result = _call_claude(prompt, max_tokens=700)
 
     if result:
         return result
@@ -912,24 +821,19 @@ def check_context_relevance(
     question: str,
     context: str,
     client_config: dict | None = None,
+    history: str = "",
 ):
     """
-    Determine whether the system has enough reliable information
-    to provide a useful answer.
-
-    Sources of truth:
-    1. Retrieved knowledge
-    2. Client configuration
-
-    The function does NOT generate an answer.
+    Decide whether the knowledge/config can produce a useful answer.
     """
 
-    config = _normalize_client_config(
-        client_config
-    )
+    config = _normalize_client_config(client_config)
+    client_profile = _build_client_profile(config)
 
-    client_profile = _build_client_profile(
-        config
+    history_block = _history_block(
+        history,
+        "CONVERSATION HISTORY",
+        "Use this only to identify what the user's question refers to.",
     )
 
     prompt = f"""
@@ -1009,6 +913,16 @@ Do not reject an answer simply because:
 - the knowledge contains extra irrelevant entries
 
 ==================================================
+UNDER-SPECIFIED QUESTIONS
+==================================================
+
+Return ANSWERABLE if the question is clear, OR the history identifies
+its subject and the knowledge covers it, OR the question lacks a
+subject but the knowledge says which detail the user must provide
+(asking for that detail is a valid answer).
+Return NOT_ANSWERABLE only when the knowledge has nothing useful.
+
+==================================================
 IMPORTANT EVIDENCE RULE
 ==================================================
 
@@ -1057,7 +971,7 @@ CLIENT CONFIGURATION
 ==================================================
 
 {client_profile}
-
+{history_block}
 ==================================================
 RETRIEVED KNOWLEDGE
 ==================================================
@@ -1080,15 +994,10 @@ or
 NOT_ANSWERABLE
 """
 
-    result = _call_claude(
-        prompt,
-        max_tokens=100,
-    )
+    result = _call_claude(prompt, max_tokens=100)
 
     if result:
         result = result.strip().upper()
-
-        # Be tolerant if Claude adds whitespace/newlines.
         first_line = result.splitlines()[0].strip()
 
         if first_line == "ANSWERABLE":
@@ -1109,17 +1018,8 @@ def classify_knowledge_gap(
     context: str,
     client_config: dict | None = None,
 ):
-    """
-    Classify why the current question cannot be answered reliably.
-    """
-
-    config = _normalize_client_config(
-        client_config
-    )
-
-    client_profile = _build_client_profile(
-        config
-    )
+    config = _normalize_client_config(client_config)
+    client_profile = _build_client_profile(config)
 
     prompt = f"""
 You are a knowledge-gap classifier for a multi-tenant
@@ -1201,10 +1101,7 @@ USER QUESTION
 {question}
 """
 
-    result = _call_claude(
-        prompt,
-        max_tokens=40,
-    )
+    result = _call_claude(prompt, max_tokens=40)
 
     if result:
         result = result.strip().upper()
@@ -1228,34 +1125,13 @@ def generate_fallback_answer(
     gap_type: str = "RELATED_BUT_UNKNOWN",
     client_config: dict | None = None,
 ) -> str:
-    """
-    Deterministic fallback.
+    """Deterministic fallback. No LLM, so it cannot hallucinate."""
 
-    No LLM is used here, which means the fallback itself
-    cannot hallucinate business facts.
-    """
-
-    config = _normalize_client_config(
-        client_config
-    )
-
-    client_name = _get_client_name(
-        config
-    )
-
-    website_url = _get_website_url(
-        config
-    )
-
-    description = _get_company_description(
-        config
-    )
-
+    config = _normalize_client_config(client_config)
+    client_name = _get_client_name(config)
+    website_url = _get_website_url(config)
+    description = _get_company_description(config)
     arabic = _is_arabic(question)
-
-    # --------------------------------------------------------------
-    # Medical advice
-    # --------------------------------------------------------------
 
     if gap_type == "MEDICAL_ADVICE":
 
@@ -1269,8 +1145,7 @@ def generate_fallback_answer(
 
             if website_url:
                 response += (
-                    f"\nيمكنك الرجوع إلى الموقع الرسمي:\n"
-                    f"{website_url}"
+                    f"\nيمكنك الرجوع إلى الموقع الرسمي:\n{website_url}"
                 )
 
             return response
@@ -1283,15 +1158,9 @@ def generate_fallback_answer(
         )
 
         if website_url:
-            response += (
-                f"\nOfficial website:\n{website_url}"
-            )
+            response += f"\nOfficial website:\n{website_url}"
 
         return response
-
-    # --------------------------------------------------------------
-    # Out of scope
-    # --------------------------------------------------------------
 
     if gap_type == "OUT_OF_SCOPE":
 
@@ -1302,15 +1171,10 @@ def generate_fallback_answer(
             )
 
             if description:
-                response += (
-                    f"\n\n{description}"
-                )
+                response += f"\n\n{description}"
 
             if website_url:
-                response += (
-                    f"\n\nللمزيد من المعلومات:\n"
-                    f"{website_url}"
-                )
+                response += f"\n\nللمزيد من المعلومات:\n{website_url}"
 
             return response
 
@@ -1320,46 +1184,30 @@ def generate_fallback_answer(
         )
 
         if description:
-            response += (
-                f"\n\n{description}"
-            )
+            response += f"\n\n{description}"
 
         if website_url:
-            response += (
-                f"\n\nFor more information:\n"
-                f"{website_url}"
-            )
+            response += f"\n\nFor more information:\n{website_url}"
 
         return response
 
-    # --------------------------------------------------------------
-    # Related but unknown
-    # --------------------------------------------------------------
-
     if arabic:
-        response = (
-            "ما لقيت معلومة مؤكدة عن هذا السؤال حاليًا 🌷"
-        )
+        response = "ما لقيت معلومة مؤكدة عن هذا السؤال حاليًا 🌷"
 
         if website_url:
             response += (
                 "\nتقدر تتأكد من الموقع الرسمي للحصول "
-                "على أدق المعلومات:"
-                f"\n{website_url}"
+                f"على أدق المعلومات:\n{website_url}"
             )
 
         return response
 
-    response = (
-        "I couldn't find confirmed information about "
-        "this right now 🌷"
-    )
+    response = "I couldn't find confirmed information about this right now 🌷"
 
     if website_url:
         response += (
             "\nPlease check the official website for "
-            "the most accurate information:"
-            f"\n{website_url}"
+            f"the most accurate information:\n{website_url}"
         )
 
     return response

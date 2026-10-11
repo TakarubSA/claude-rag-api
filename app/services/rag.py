@@ -17,15 +17,16 @@ from app.llm.claude import (
 CASUAL_MARKER = "__CASUAL_CONVERSATION__"
 
 SEARCH_LIMIT = 20
-CONTEXT_LIMIT = 6
+CONTEXT_LIMIT = 8
 MAX_DISTANCE = 0.65          # semantic-only rows must be this close
-MAX_DISTANCE_KEYWORD = 0.80  # rows with an exact keyword hit may be a bit farther
+MAX_DISTANCE_KEYWORD = 0.80  # rows with an exact keyword hit may be farther
 MAX_HISTORY_CHARS = 6000
 
 USE_RERANK = False
 
 NOISE_MARKERS = (
     "هذه المعلومة تشمل أسئلة مثل",
+    "يشمل هذا السؤال الاستفسارات التالية",
 )
 
 
@@ -122,6 +123,26 @@ def _is_relevant(result) -> bool:
     return hits > 0 and distance <= MAX_DISTANCE_KEYWORD
 
 
+def _dedupe_results(results):
+    """Drop rows whose cleaned content is identical, before applying the limit."""
+    out = []
+    seen: set[str] = set()
+
+    for result in results:
+        content = _clean_content(result.content)
+        if not content:
+            continue
+
+        key = re.sub(r"\s+", " ", content).strip().casefold()
+        if key in seen:
+            continue
+
+        seen.add(key)
+        out.append(result)
+
+    return out
+
+
 def _rerank(query: str, results):
     if not USE_RERANK or len(results) < 2:
         return results
@@ -151,25 +172,11 @@ def _rerank(query: str, results):
 
 
 def _build_context(results) -> str:
-    if not results:
-        return ""
-
-    entries: list[str] = []
-    seen: set[str] = set()
-
-    for result in results:
-        content = _clean_content(result.content)
-        if not content:
-            continue
-
-        key = re.sub(r"\s+", " ", content).strip().casefold()
-        if key in seen:
-            continue
-
-        seen.add(key)
-        entries.append(content)
-
-    return "\n\n".join(entries)
+    return "\n\n".join(
+        _clean_content(r.content)
+        for r in results
+        if _clean_content(r.content)
+    )
 
 
 # --------------------------------------------------
@@ -182,12 +189,13 @@ def _generate_grounded_answer(
     context: str,
     client_config: dict | None,
     best_distance=None,
+    history: str = "",
 ):
-    """Answer only when retrieved knowledge/config supports the answer."""
     relevance = check_context_relevance(
         question=question,
         context=context,
         client_config=client_config,
+        history=history,
     )
 
     print("CONTEXT RELEVANCE:", relevance)
@@ -199,6 +207,7 @@ def _generate_grounded_answer(
         question=question,
         context=context,
         client_config=client_config,
+        history=history,
     )
 
     if not isinstance(answer, str) or not answer.strip():
@@ -240,10 +249,10 @@ def answer_question(
             "status": "EMPTY_QUESTION",
         }
 
-    # 1) Rewrite into a standalone retrieval query, resolving references
-    #    from the conversation history (also detects casual chat).
     history = (conversation_context or "")[-MAX_HISTORY_CHARS:]
 
+    # 1) Rewrite into a retrieval query; resolves references from history
+    #    and detects casual chat.
     search_query = rewrite_query(
         cleaned_question,
         client_config=client_config,
@@ -254,9 +263,6 @@ def answer_question(
         search_query = cleaned_question
     else:
         search_query = search_query.strip()
-
-    # The rewritten query is the standalone question.
-    standalone = cleaned_question if search_query == CASUAL_MARKER else search_query
 
     print("ORIGINAL QUERY:", cleaned_question)
     print("SEARCH QUERY:", search_query)
@@ -275,10 +281,8 @@ def answer_question(
             }
 
         search_query = cleaned_question
-        standalone = cleaned_question
 
-    # 2) Search with the rewritten and original wording (deduplicated).
-    #    The original keeps names/acronyms the rewriter may change.
+    # 2) Search with the rewritten and original wording.
     texts: list[str] = []
     for t in (search_query, cleaned_question):
         if t and t.casefold() not in {x.casefold() for x in texts}:
@@ -292,6 +296,7 @@ def answer_question(
         result_lists = []
 
     results = [r for r in _merge(*result_lists) if _is_relevant(r)]
+    results = _dedupe_results(results)
 
     if results:
         results = _rerank(search_query, results)
@@ -318,12 +323,14 @@ def answer_question(
         default=None,
     )
 
-    # 3) Answer only from the knowledge, using the standalone question.
+    # 3) The model decides: clear question / subject from history /
+    #    ask for the missing detail. Facts come only from the knowledge.
     grounded_result = _generate_grounded_answer(
-        question=standalone,
+        question=cleaned_question,
         context=knowledge_context,
         client_config=client_config,
         best_distance=best_distance,
+        history=history,
     )
 
     if grounded_result:
@@ -331,9 +338,9 @@ def answer_question(
             grounded_result["status"] = "CONFIG_ONLY"
         return grounded_result
 
-    # 4) No grounded answer: classify the gap and use the deterministic fallback.
+    # 4) Nothing usable: classify the gap and use the deterministic fallback.
     gap_type = classify_knowledge_gap(
-        question=standalone,
+        question=search_query,
         context=knowledge_context,
         client_config=client_config,
     )
@@ -341,7 +348,7 @@ def answer_question(
     print("KNOWLEDGE GAP:", gap_type)
 
     fallback = generate_fallback_answer(
-        question=standalone,
+        question=cleaned_question,
         gap_type=gap_type,
         client_config=client_config,
     )
