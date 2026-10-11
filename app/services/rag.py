@@ -4,7 +4,6 @@ from typing import Any
 
 from app.embeddings.voyage import create_embeddings
 from app.knowledge.repository import search_knowledge
-
 from app.llm.claude import (
     rewrite_query,
     generate_answer,
@@ -20,6 +19,7 @@ CASUAL_MARKER = "__CASUAL_CONVERSATION__"
 SEARCH_LIMIT = 20
 CONTEXT_LIMIT = 6
 MAX_DISTANCE = 0.65
+MAX_HISTORY_CHARS = 6000
 
 USE_RERANK = False
 
@@ -31,6 +31,7 @@ NOISE_MARKERS = (
 # --------------------------------------------------
 # Text helpers
 # --------------------------------------------------
+
 
 def _clean_text(text: str) -> str:
     """Normalize text without changing its intended meaning."""
@@ -49,30 +50,15 @@ def _clean_text(text: str) -> str:
 
 
 def _clean_answer_format(answer: str) -> str:
-    """
-    Remove Markdown bold markers so they are never shown literally
-    in the customer-facing answer.
-    """
+    """Remove Markdown bold markers from customer-facing answers."""
     answer = (answer or "").strip()
 
     # Remove paired bold markers while preserving their inner text.
-    answer = re.sub(
-        r"\*\*(.*?)\*\*",
-        r"\1",
-        answer,
-        flags=re.DOTALL,
-    )
-
-    # Remove any remaining double-star markers.
+    answer = re.sub(r"\*\*(.*?)\*\*", r"\1", answer, flags=re.DOTALL)
     answer = answer.replace("**", "")
 
-    # Also remove paired Markdown bold markers written with underscores.
-    answer = re.sub(
-        r"__(.*?)__",
-        r"\1",
-        answer,
-        flags=re.DOTALL,
-    )
+    # Also remove Markdown bold markers written with underscores.
+    answer = re.sub(r"__(.*?)__", r"\1", answer, flags=re.DOTALL)
     answer = answer.replace("__", "")
 
     return answer.strip()
@@ -93,16 +79,13 @@ def _build_contextual_question(
     question: str,
     conversation_context: str | None,
 ) -> str:
-    """
-    Build a clear input that explains which message must be answered
-    and how the conversation history should be used.
-    """
+    """Explain how the latest message should be interpreted using history."""
     history = (conversation_context or "").strip()
 
     if not history:
         return question
 
-    history = history[-6000:]
+    history = history[-MAX_HISTORY_CHARS:]
 
     return f"""
 Use the recent conversation to understand the user's latest message.
@@ -138,13 +121,11 @@ INSTRUCTIONS:
 # Retrieval helpers
 # --------------------------------------------------
 
+
 def _search_many(texts: list[str], client_id: int):
     """Search the current tenant's knowledge for each query."""
     try:
-        embeddings = create_embeddings(
-            texts,
-            input_type="query",
-        )
+        embeddings = create_embeddings(texts, input_type="query")
 
         if len(embeddings) != len(texts):
             raise ValueError(
@@ -168,14 +149,12 @@ def _search_many(texts: list[str], client_id: int):
 
 
 def _merge(*result_lists):
-    """Merge query results, deduplicate records, and keep best rank."""
+    """Merge query results, deduplicate records, and keep the best rank."""
     best: dict[Any, Any] = {}
 
     def retrieval_order(result):
         score = getattr(result, "rank_score", result.distance)
-        keyword_hits = int(
-            getattr(result, "keyword_hits", 0) or 0
-        )
+        keyword_hits = int(getattr(result, "keyword_hits", 0) or 0)
         distance = float(result.distance)
 
         return (
@@ -191,16 +170,10 @@ def _merge(*result_lists):
         for result in results:
             current = best.get(result.id)
 
-            if (
-                current is None
-                or retrieval_order(result) < retrieval_order(current)
-            ):
+            if current is None or retrieval_order(result) < retrieval_order(current):
                 best[result.id] = result
 
-    return sorted(
-        best.values(),
-        key=retrieval_order,
-    )
+    return sorted(best.values(), key=retrieval_order)
 
 
 def _rerank(query: str, results):
@@ -218,21 +191,14 @@ def _rerank(query: str, results):
             return results
 
         voyage_client = voyageai.Client(api_key=api_key)
-
         reranked = voyage_client.rerank(
             query=query,
-            documents=[
-                _clean_content(result.content)
-                for result in results
-            ],
+            documents=[_clean_content(result.content) for result in results],
             model="rerank-2",
             top_k=min(CONTEXT_LIMIT, len(results)),
         )
 
-        return [
-            results[item.index]
-            for item in reranked.results
-        ]
+        return [results[item.index] for item in reranked.results]
 
     except Exception as exc:
         print(f"RERANK ERROR: {exc}")
@@ -253,11 +219,7 @@ def _build_context(results) -> str:
         if not content:
             continue
 
-        dedupe_key = re.sub(
-            r"\s+",
-            " ",
-            content,
-        ).strip().casefold()
+        dedupe_key = re.sub(r"\s+", " ", content).strip().casefold()
 
         if dedupe_key in seen:
             continue
@@ -271,6 +233,7 @@ def _build_context(results) -> str:
 # --------------------------------------------------
 # Grounded answer generation
 # --------------------------------------------------
+
 
 def _generate_grounded_answer(
     question: str,
@@ -314,6 +277,7 @@ def _generate_grounded_answer(
 # Main RAG pipeline
 # --------------------------------------------------
 
+
 def answer_question(
     question: str,
     client_id: int,
@@ -323,8 +287,8 @@ def answer_question(
     """
     Multi-tenant RAG pipeline with conversation-aware retrieval.
 
-    The latest user message is interpreted in context. Knowledge
-    retrieval remains isolated by client_id.
+    The latest user message is interpreted in context. Knowledge retrieval
+    remains isolated by client_id.
     """
     print("CLIENT CONFIG LOADED:", bool(client_config))
     print(
@@ -379,22 +343,18 @@ def answer_question(
 
         search_query = cleaned_question
 
-    # If conversation context exists, avoid adding the short,
-    # context-free question as a separate competing retrieval query.
+    # Search with the rewritten query and, when different, the original wording.
+    # The original wording can preserve acronyms, names, and terms that the
+    # rewriter may accidentally replace (for example, SIBO / "سيبو").
     texts = [search_query]
 
     if (
-        not conversation_context
-        and cleaned_question
-        and cleaned_question != search_query
+        cleaned_question
+        and cleaned_question.casefold() != search_query.casefold()
     ):
         texts.append(cleaned_question)
 
-    result_lists = _search_many(
-        texts,
-        client_id,
-    )
-
+    result_lists = _search_many(texts, client_id)
     search_failed = result_lists is None
 
     if search_failed:
@@ -414,20 +374,14 @@ def answer_question(
     ]
 
     if results:
-        results = _rerank(
-            search_query,
-            results,
-        )
+        results = _rerank(search_query, results)
         results = results[:CONTEXT_LIMIT]
 
     if results:
         for result in results:
             print("ID:", result.id)
             print("DISTANCE:", result.distance)
-            print(
-                "KEYWORD HITS:",
-                getattr(result, "keyword_hits", 0),
-            )
+            print("KEYWORD HITS:", getattr(result, "keyword_hits", 0))
             print(
                 "RANK SCORE:",
                 getattr(result, "rank_score", result.distance),
@@ -444,15 +398,12 @@ def answer_question(
     print("========================================\n")
 
     best_distance = min(
-        (
-            float(result.distance)
-            for result in results
-        ),
+        (float(result.distance) for result in results),
         default=None,
     )
 
-    # Relevance checking and answer generation both receive history
-    # so the latest short question can be understood correctly.
+    # Relevance checking and answer generation receive the contextual question
+    # so the latest short message can be understood correctly.
     grounded_result = _generate_grounded_answer(
         question=contextual_question,
         context=knowledge_context,
@@ -467,7 +418,6 @@ def answer_question(
         grounded_result["answer"] = _clean_answer_format(
             grounded_result["answer"]
         )
-
         return grounded_result
 
     # Use the same context-aware question for gap classification.
