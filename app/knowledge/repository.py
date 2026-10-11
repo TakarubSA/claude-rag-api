@@ -6,49 +6,73 @@ from sqlalchemy import text
 from app.database.connection import engine
 
 
-# Generic Arabic and English stop words. These are used only for
-# lexical retrieval, not for changing the user's original question.
+# Normalize common Arabic spelling variants for keyword retrieval.
+_ARABIC_TRANSLATION = str.maketrans({
+    "أ": "ا",
+    "إ": "ا",
+    "آ": "ا",
+    "ٱ": "ا",
+    "ى": "ي",
+    "ؤ": "و",
+    "ئ": "ي",
+})
+
+
 _STOP_WORDS = {
-    "هل", "من", "في", "على", "عن", "الى", "إلى", "مع", "او", "أو",
-    "ما", "ماذا", "كيف", "متى", "وين", "أين", "ايش", "إيش", "وش",
-    "مين", "كم", "ليش", "لماذا", "انا", "أنا", "انت", "أنت", "عندي",
-    "عندنا", "عندكم", "لدينا", "لديكم", "ممكن", "لو", "ابغى", "أبغى",
-    "ابي", "أبي", "اريد", "أريد", "احتاج", "أحتاج", "هذا", "هذه",
-    "ذلك", "تلك", "الذي", "التي", "هو", "هي", "هم", "نحن", "كان",
-    "كانت", "يكون", "تكون", "اللي", "بس", "يعني", "عشان", "فقط",
-    "ثم", "و", "the", "and", "for", "are", "you", "your", "what",
-    "how", "can", "with", "from",
-    # Common domain words are weak signals on their own.
-    "حكيم", "كير", "طبيب", "الطبيب", "اطباء", "أطباء",
-    "الاطباء", "الأطباء", "دواء", "الدواء", "الأدوية", "الادوية",
-    "خدمة", "الخدمة", "استشارة", "استشاره", "طبية", "الطبية",
+    "هل", "من", "في", "على", "عن", "مع", "او", "ما", "ماذا",
+    "كيف", "متى", "وين", "اين", "ايش", "وش", "مين", "كم",
+    "ليش", "لماذا", "انا", "انت", "عندي", "عندنا", "عندكم",
+    "لدينا", "لديكم", "ممكن", "لو", "ابغى", "ابي", "اريد",
+    "احتاج", "هذا", "هذه", "ذلك", "تلك", "الذي", "التي",
+    "هو", "هي", "هم", "نحن", "كان", "كانت", "يكون", "تكون",
+    "اللي", "بس", "يعني", "عشان", "فقط", "ثم", "و",
+    "the", "and", "for", "are", "you", "your", "what", "how",
+    "can", "with", "from",
+    "حكيم", "كير", "طبيب", "طبي", "طبية", "طبيه",
+    "اطباء", "دواء", "ادوية", "خدمة", "استشارة", "استشاره",
+    "دكتور", "دكتورة", "الدكتورة",
 }
 
 
+def _normalize_arabic(value: str) -> str:
+    """Normalize common Arabic letter variants and diacritics."""
+    value = re.sub(
+        r"[\u064B-\u065F\u0670\u0640]",
+        "",
+        value.lower(),
+    )
+    return value.translate(_ARABIC_TRANSLATION)
+
+
 def _extract_keywords(query_text: str | None) -> list[str]:
-    """Extract distinctive Arabic/English terms for lexical retrieval."""
+    """Extract distinctive terms for lexical retrieval."""
     if not query_text:
         return []
 
-    query_text = re.sub(
-        r"[\u064B-\u065F\u0670\u0640]",
-        "",
-        query_text.lower(),
+    normalized = _normalize_arabic(query_text)
+    tokens = re.findall(
+        r"[\u0600-\u06FF]+|[a-z0-9]+",
+        normalized,
     )
-
-    tokens = re.findall(r"[\u0600-\u06FF]+|[a-z0-9]+", query_text)
 
     keywords = []
     seen = set()
 
     for token in tokens:
-        if len(token) < 3 or token in _STOP_WORDS or token in seen:
+        # Strip the Arabic definite article for comparison.
+        if token.startswith("ال") and len(token) > 4:
+            token = token[2:]
+
+        if (
+            len(token) < 3
+            or token in _STOP_WORDS
+            or token in seen
+        ):
             continue
 
         seen.add(token)
         keywords.append(token)
 
-    # Keep SQL work bounded for long messages.
     return keywords[:12]
 
 
@@ -65,7 +89,7 @@ def insert_knowledge(
         )
         VALUES (
             :content,
-            :embedding,
+            CAST(:embedding AS vector),
             :client_id
         )
     """)
@@ -88,14 +112,10 @@ def search_knowledge(
     query_text: str | None = None,
 ):
     """
-    Hybrid retrieval:
-    1. Retrieve the nearest vector matches.
-    2. Retrieve exact keyword matches.
-    3. Merge candidates and boost distinctive lexical matches.
+    Hybrid retrieval combining semantic similarity and whole-word matches.
 
-    Tenant isolation is enforced in BOTH retrieval paths.
-    `distance` remains the real vector distance.
-    `rank_score` is only used to order combined candidates.
+    Every search path is restricted to the requested client_id.
+    Results expose distance, keyword_hits and rank_score.
     """
     keywords = _extract_keywords(query_text)
 
@@ -108,7 +128,8 @@ def search_knowledge(
                 0::INTEGER AS keyword_hits
             FROM knowledge
             WHERE client_id = :client_id
-            ORDER BY embedding <=> CAST(:embedding AS vector)
+            ORDER BY
+                embedding <=> CAST(:embedding AS vector)
             LIMIT :limit
         ),
         lexical AS (
@@ -118,20 +139,57 @@ def search_knowledge(
                 k.embedding <=> CAST(:embedding AS vector) AS distance,
                 (
                     SELECT COUNT(*)
-                    FROM unnest(CAST(:keywords AS TEXT[])) AS kw(keyword)
-                    WHERE k.content ILIKE '%' || kw.keyword || '%'
+                    FROM unnest(CAST(:keywords AS TEXT[]))
+                        AS kw(keyword)
+                    WHERE EXISTS (
+                        SELECT 1
+                        FROM regexp_split_to_table(
+                            translate(
+                                lower(k.content),
+                                'أإآٱى',
+                                'ااااي'
+                            ),
+                            '[^a-z0-9ء-ي]+'
+                        ) AS words(token)
+                        WHERE
+                            words.token = kw.keyword
+                            OR (
+                                words.token LIKE 'ال%'
+                                AND substring(words.token FROM 3)
+                                    = kw.keyword
+                            )
+                    )
                 ) AS keyword_hits
             FROM knowledge AS k
-            WHERE k.client_id = :client_id
-              AND cardinality(CAST(:keywords AS TEXT[])) > 0
-              AND EXISTS (
-                  SELECT 1
-                  FROM unnest(CAST(:keywords AS TEXT[])) AS kw(keyword)
-                  WHERE k.content ILIKE '%' || kw.keyword || '%'
-              )
+            WHERE
+                k.client_id = :client_id
+                AND cardinality(CAST(:keywords AS TEXT[])) > 0
+                AND EXISTS (
+                    SELECT 1
+                    FROM unnest(CAST(:keywords AS TEXT[]))
+                        AS kw(keyword)
+                    WHERE EXISTS (
+                        SELECT 1
+                        FROM regexp_split_to_table(
+                            translate(
+                                lower(k.content),
+                                'أإآٱى',
+                                'ااااي'
+                            ),
+                            '[^a-z0-9ء-ي]+'
+                        ) AS words(token)
+                        WHERE
+                            words.token = kw.keyword
+                            OR (
+                                words.token LIKE 'ال%'
+                                AND substring(words.token FROM 3)
+                                    = kw.keyword
+                            )
+                    )
+                )
             ORDER BY
                 keyword_hits DESC,
-                k.embedding <=> CAST(:embedding AS vector) ASC
+                k.embedding <=> CAST(:embedding AS vector)
             LIMIT :limit
         ),
         candidates AS (
@@ -160,19 +218,16 @@ def search_knowledge(
             content,
             distance,
             keyword_hits,
-            distance - CASE
-                WHEN keyword_hits > 0 THEN
-                    LEAST(
-                        0.20,
-                        0.16 + ((keyword_hits - 1) * 0.02)
-                    )
-                ELSE 0
-            END AS rank_score
+            distance - LEAST(
+                0.12,
+                keyword_hits * 0.04
+            ) AS rank_score
         FROM deduplicated
-       ORDER BY keyword_hits DESC,
-       rank_score ASC,
-    distance ASC
-LIMIT :limit
+        ORDER BY
+            rank_score ASC,
+            keyword_hits DESC,
+            distance ASC
+        LIMIT :limit
     """)
 
     with engine.connect() as connection:
