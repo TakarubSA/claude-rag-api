@@ -5,7 +5,6 @@ from typing import Any
 from app.embeddings.voyage import create_embeddings
 from app.knowledge.repository import search_knowledge
 from app.llm.claude import (
-    condense_question,
     rewrite_query,
     generate_answer,
     generate_casual_answer,
@@ -241,29 +240,25 @@ def answer_question(
             "status": "EMPTY_QUESTION",
         }
 
-    # 1) Make the latest message a standalone question using the history.
+    # 1) Rewrite into a standalone retrieval query, resolving references
+    #    from the conversation history (also detects casual chat).
     history = (conversation_context or "")[-MAX_HISTORY_CHARS:]
-    standalone = condense_question(
-        cleaned_question,
-        history,
-        client_config=client_config,
-    )
-    if not standalone:
-        standalone = cleaned_question
 
-    # 2) Turn it into a short retrieval query (also detects casual chat).
     search_query = rewrite_query(
-        standalone,
+        cleaned_question,
         client_config=client_config,
+        history=history,
     )
 
     if not isinstance(search_query, str) or not search_query.strip():
-        search_query = standalone
+        search_query = cleaned_question
     else:
         search_query = search_query.strip()
 
+    # The rewritten query is the standalone question.
+    standalone = cleaned_question if search_query == CASUAL_MARKER else search_query
+
     print("ORIGINAL QUERY:", cleaned_question)
-    print("STANDALONE QUESTION:", standalone)
     print("SEARCH QUERY:", search_query)
 
     if search_query == CASUAL_MARKER:
@@ -279,11 +274,13 @@ def answer_question(
                 "status": "CASUAL",
             }
 
-        search_query = standalone
+        search_query = cleaned_question
+        standalone = cleaned_question
 
-    # 3) Search with rewritten, standalone, and original wording (deduplicated).
+    # 2) Search with the rewritten and original wording (deduplicated).
+    #    The original keeps names/acronyms the rewriter may change.
     texts: list[str] = []
-    for t in (search_query, standalone, cleaned_question):
+    for t in (search_query, cleaned_question):
         if t and t.casefold() not in {x.casefold() for x in texts}:
             texts.append(t)
 
@@ -321,7 +318,7 @@ def answer_question(
         default=None,
     )
 
-    # 4) Answer only from the knowledge, using the standalone question.
+    # 3) Answer only from the knowledge, using the standalone question.
     grounded_result = _generate_grounded_answer(
         question=standalone,
         context=knowledge_context,
@@ -334,7 +331,7 @@ def answer_question(
             grounded_result["status"] = "CONFIG_ONLY"
         return grounded_result
 
-    # 5) No grounded answer: classify the gap and use the deterministic fallback.
+    # 4) No grounded answer: classify the gap and use the deterministic fallback.
     gap_type = classify_knowledge_gap(
         question=standalone,
         context=knowledge_context,
