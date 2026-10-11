@@ -1,4 +1,5 @@
 import os
+import re
 
 import anthropic
 from dotenv import load_dotenv
@@ -10,96 +11,147 @@ client = anthropic.Anthropic(
 )
 
 
-def classify_intent(message: str):
+def normalize_text(text: str) -> str:
+    """Normalize Arabic and English text for reliable keyword matching."""
+    text = (text or "").lower()
+
+    # Normalize Arabic-Indic and Persian digits.
+    text = text.translate(
+        str.maketrans(
+            "٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹",
+            "01234567890123456789",
+        )
+    )
+
+    # Remove Arabic diacritics and tatweel.
+    text = re.sub(r"[\u064B-\u065F\u0670\u0640]", "", text)
+
+    # Normalize common Arabic letter variants.
+    text = text.translate(
+        str.maketrans({
+            "أ": "ا",
+            "إ": "ا",
+            "آ": "ا",
+        })
+    )
+
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def is_lab_booking_handoff(
+    message: str,
+    conversation_context: str = "",
+) -> bool:
+    """
+    Route laboratory booking-number requests directly to an agent.
+
+    conversation_context should contain recent conversation messages,
+    not the entire knowledge-base context.
+    """
+    text = normalize_text(
+        f"{conversation_context}\n{message}"
+    )
+
+    lab_terms = (
+        "دلتا",
+        "delta",
+        "مختبر",
+        "مختبرات",
+        "المختبر",
+        "تحاليل",
+        "تحليل",
+        "laboratory",
+        "laboratories",
+        "lab",
+    )
+
+    booking_terms = (
+        "رقم الحجز",
+        "رقم حجز",
+        "رقم الحجوز",
+        "حجز التحاليل",
+        "حجز تحاليل",
+        "booking number",
+        "booking reference",
+        "booking no",
+        "booking id",
+        "reservation number",
+        "booking code",
+    )
+
+    has_lab_context = any(term in text for term in lab_terms)
+    asks_for_booking_number = any(
+        term in text for term in booking_terms
+    )
+
+    return has_lab_context and asks_for_booking_number
+
+
+def classify_intent(
+    message: str,
+    conversation_context: str = "",
+) -> str:
+    # Rule 1: Lab booking-number requests always go to an agent.
+    # Do not let the model classify these requests as "api".
+    if is_lab_booking_handoff(message, conversation_context):
+        return "handoff"
+
     prompt = f"""
-Classify the user's message into exactly ONE of these actions:
+Classify the user's message into exactly ONE action:
 
 reply
 api
 handoff
 
-Definitions:
+IMPORTANT BUSINESS RULE — Hakeem Care / Delta Laboratories:
+
+Requests for laboratory booking numbers must be routed to handoff
+when the message or recent conversation context indicates that the
+request concerns laboratory tests or Delta Laboratories.
+
+Examples:
+- ابغى رقم الحجز انا في المختبر
+- ما وصلني رقم حجز التحاليل
+- حجزت تحاليل دلتا وابغى الرقم
+- وين رقم حجز مختبرات دلتا؟
+- I need my lab booking number.
+- I am at the lab and haven't received my booking number.
+
+For these requests, return handoff, NOT api.
+A staff member will collect the patient's name, age, and test name,
+then handle issuing the booking number.
+Do not ask the user to provide those details before handoff.
 
 reply:
-Use this when the user is asking for general information that can be
-answered using the knowledge base, or when the user is simply greeting
-or starting a conversation.
-
-Examples:
-- كيف أحجز موعد؟
-- ايش طرق الدفع؟
-- وين موقع العيادة؟
-- هل أقدر أغير موعدي؟
-- السلام عليكم
-- مرحبا
-- صباح الخير
-- كيف حالك؟
+Use for general information answerable from the knowledge base,
+greetings, and general conversation.
 
 api:
-Use this when the user wants the system to perform an operation,
-check live data, retrieve specific information, or interact with
-an external system/API.
-
-IMPORTANT:
-A message can be written as a question and still be api.
-
-If the user asks about a specific:
-- flight number
-- booking number
-- order number
-- appointment number
-- customer number
-- tracking number
-- invoice number
-- or any other identifier
-
-and the system needs to check or retrieve information about it,
-use api.
-
-Examples:
-- هل رحلتي 12345 صار فيها نداء؟
-- شيك على رحلتي 12345
-- أبغى أعرف حالة الرحلة 12345
-- وين طلبي 98765؟
-- شيك على موعدي 4567
-- هل الطلب 12345 تم شحنه؟
-- ابحث عن فاتورتي 12345
+Use when the system must perform an operation or retrieve specific
+live information from an external system/API, except for the
+laboratory booking-number workflow defined above.
 
 handoff:
-Use this when the user explicitly or implicitly wants to speak
-with a real human agent, customer service representative, employee,
-or specialist.
+Use when the user explicitly or implicitly needs a human agent,
+customer service representative, employee, or specialist.
 
 Examples:
 - أبغى أكلم موظف
-- أريد التحدث مع موظف
 - حولني لموظف
 - أبغى خدمة العملاء
 - ممكن أكلم شخص حقيقي؟
-- أريد التحدث مع شخص
-- احتاج موظف يساعدني
-- حولني لأحد الموظفين
-- أبغى أكلم الدعم
-- ما أبغى أكمل مع البوت
-- أبغى شخص من خدمة العملاء
-
-IMPORTANT:
-If the user requests a human agent, always use handoff even if
-the message also contains a question, complaint, or problem.
-
-Examples:
-- ما قدرت أحجز وأبغى أكلم موظف
-- عندي مشكلة في موعدي، حولني لموظف
-- الطلب ما وصلني وأبغى شخص يساعدني
-- ممكن أحد من خدمة العملاء يتواصل معي؟
+- عندي مشكلة وأحتاج موظف يساعدني
 
 Priority rules:
+1. Delta/laboratory booking-number request -> handoff.
+2. Explicit or implicit request for a human agent -> handoff.
+3. Other requests requiring live or external data -> api.
+4. Otherwise -> reply.
 
-1. If the user wants a human agent → handoff
-2. If the user needs live/specific/external data → api
-3. Otherwise → reply
+Recent conversation context:
+{conversation_context or "(none supplied)"}
 
-User message:
+Current user message:
 {message}
 
 Return ONLY one of:
@@ -123,28 +175,11 @@ handoff
         if hasattr(block, "text") and block.text:
             result = block.text.strip().lower()
 
-            allowed_actions = {
-                "reply",
-                "api",
-                "handoff",
-            }
-
-            if result in allowed_actions:
+            if result in {"reply", "api", "handoff"}:
                 return result
 
-            print(
-                "Unexpected Claude classification:",
-                result,
-            )
-
+            print("Unexpected Claude classification:", result)
             return "reply"
 
-    # Claude returned no text block.
-    # Don't crash the /chat endpoint.
-    print(
-        "Claude returned no text block.",
-        "Content:",
-        response.content,
-    )
-
+    print("Claude returned no text block.")
     return "reply"
