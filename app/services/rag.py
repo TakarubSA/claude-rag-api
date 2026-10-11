@@ -73,10 +73,34 @@ def _clean_content(content: str) -> str:
     return content.strip()
 
 
+
 def _search_many(
     texts,
     client_id: int,
 ):
+    """
+    Run hybrid retrieval for every query using its text and embedding.
+    Tenant isolation is enforced by search_knowledge.
+    """
+    try:
+        embeddings = create_embeddings(texts)
+
+        return [
+            search_knowledge(
+                embedding,
+                client_id=client_id,
+                limit=SEARCH_LIMIT,
+                query_text=query_text,
+            )
+            for query_text, embedding in zip(texts, embeddings)
+        ]
+
+    except Exception as e:
+        print(f"SEARCH ERROR: {e}")
+        return None
+
+
+
     """
     Run semantic retrieval for all queries in one embedding request.
 
@@ -107,30 +131,33 @@ def _search_many(
         return None
 
 
+
 def _merge(*result_lists):
     """
-    Merge retrieval results from multiple queries.
-
-    If the same knowledge row appears multiple times,
-    keep the best semantic distance.
+    Merge results from semantic and lexical queries.
+    Keep the best-ranked occurrence of each knowledge row.
     """
-
     best = {}
+
+    def rank_score(result):
+        return getattr(result, "rank_score", result.distance)
 
     for results in result_lists:
         if not results:
             continue
 
         for result in results:
+            current = best.get(result.id)
+
             if (
-                result.id not in best
-                or result.distance < best[result.id].distance
+                current is None
+                or rank_score(result) < rank_score(current)
             ):
                 best[result.id] = result
 
     return sorted(
         best.values(),
-        key=lambda result: result.distance,
+        key=rank_score,
     )
 
 
