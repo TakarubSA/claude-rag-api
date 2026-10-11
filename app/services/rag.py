@@ -50,7 +50,7 @@ def _clean_text(text: str) -> str:
 
 
 def _clean_answer_format(answer: str) -> str:
-    """Clean formatting and hide internal RAG terminology from customer-facing answers."""
+    """Remove Markdown bold markers from customer-facing answers."""
     answer = (answer or "").strip()
 
     # Remove paired bold markers while preserving their inner text.
@@ -60,15 +60,6 @@ def _clean_answer_format(answer: str) -> str:
     # Also remove Markdown bold markers written with underscores.
     answer = re.sub(r"__(.*?)__", r"\1", answer, flags=re.DOTALL)
     answer = answer.replace("__", "")
-
-    # Replace internal technical terms if the model accidentally exposes them.
-    internal_terms = (
-        ("المعلومات المسترجعة", "المعلومات المتاحة"),
-        ("البيانات المسترجعة", "المعلومات المتاحة"),
-        ("السياق", "المعلومات المتاحة"),
-    )
-    for internal_term, customer_friendly_term in internal_terms:
-        answer = answer.replace(internal_term, customer_friendly_term)
 
     return answer.strip()
 
@@ -119,8 +110,6 @@ INSTRUCTIONS:
 - Use the retrieved knowledge and client configuration to verify
   business facts.
 - Do not invent prices, qualifications, policies, or other details.
-- Never mention internal technical terms such as "السياق" or "المعلومات المسترجعة".
-- Speak naturally as a customer-service agent. If information is unavailable, say so simply without explaining internal system mechanics.
 - If the available knowledge does not answer the latest question,
   say so clearly and direct the user to the appropriate support channel.
 - Write in the user's language.
@@ -251,18 +240,30 @@ def _generate_grounded_answer(
     context: str,
     client_config: dict | None,
     best_distance=None,
-    history: str = "",
 ):
-    """Let Claude answer from retrieved knowledge instead of pre-rejecting it."""
+    """Answer only when retrieved knowledge/config supports the answer."""
+    relevance = check_context_relevance(
+        question=question,
+        context=context,
+        client_config=client_config,
+    )
+
+    print("CONTEXT RELEVANCE:", relevance)
+
+    if relevance != "ANSWERABLE":
+        return None
+
     answer = generate_answer(
         question=question,
         context=context,
         client_config=client_config,
-        history=history,
     )
 
     if not isinstance(answer, str) or not answer.strip():
-        print("GROUNDED ANSWER EMPTY: falling back to knowledge-gap handling")
+        print(
+            "GROUNDED ANSWER EMPTY: "
+            "falling back to knowledge-gap handling"
+        )
         return None
 
     return {
@@ -306,14 +307,16 @@ def answer_question(
             "status": "EMPTY_QUESTION",
         }
 
-    # Keep the latest message and conversation history separate.
-    history = (conversation_context or "").strip()[-MAX_HISTORY_CHARS:]
-
-    # Claude resolves references using history and creates a standalone search query.
-    search_query = rewrite_query(
+    # Use history to resolve short follow-up questions.
+    contextual_question = _build_contextual_question(
         cleaned_question,
+        conversation_context,
+    )
+
+    # Rewrite the contextualized message into a retrieval query.
+    search_query = rewrite_query(
+        contextual_question,
         client_config=client_config,
-        history=history,
     )
 
     if not isinstance(search_query, str) or not search_query.strip():
@@ -399,13 +402,13 @@ def answer_question(
         default=None,
     )
 
-    # Claude gets the actual latest message and history as separate inputs.
+    # Relevance checking and answer generation receive the contextual question
+    # so the latest short message can be understood correctly.
     grounded_result = _generate_grounded_answer(
-        question=cleaned_question,
+        question=contextual_question,
         context=knowledge_context,
         client_config=client_config,
         best_distance=best_distance,
-        history=history,
     )
 
     if grounded_result:
@@ -417,8 +420,9 @@ def answer_question(
         )
         return grounded_result
 
+    # Use the same context-aware question for gap classification.
     gap_type = classify_knowledge_gap(
-        question=cleaned_question,
+        question=contextual_question,
         context=knowledge_context,
         client_config=client_config,
     )
@@ -426,7 +430,7 @@ def answer_question(
     print("KNOWLEDGE GAP:", gap_type)
 
     fallback = generate_fallback_answer(
-        question=cleaned_question,
+        question=contextual_question,
         gap_type=gap_type,
         client_config=client_config,
     )
