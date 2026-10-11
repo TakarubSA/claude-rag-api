@@ -519,9 +519,7 @@ USER MESSAGE
     if result.startswith(
         "SEARCH_QUERY:"
     ):
-        result = result[
-            len("SEARCH_QUERY:")
-        ].strip()
+        result = result[len("SEARCH_QUERY:"):].strip()
 
     return result or cleaned or question
 

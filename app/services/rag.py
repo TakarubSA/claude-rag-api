@@ -14,7 +14,7 @@ from app.llm.claude import (
 
 
 CASUAL_MARKER = "__CASUAL_CONVERSATION__"
-SEARCH_LIMIT = 8
+SEARCH_LIMIT = 20
 CONTEXT_LIMIT = 6
 
 # Keep disabled until retrieval quality is tested properly.
@@ -56,7 +56,7 @@ def _clean_content(content: str) -> str:
 def _search_many(texts: list[str], client_id: int):
     """Run hybrid retrieval for every query using its text and embedding."""
     try:
-        embeddings = create_embeddings(texts)
+        embeddings = create_embeddings(texts, input_type="query")
         if len(embeddings) != len(texts):
             raise ValueError(
                 f"Embedding count mismatch: got {len(embeddings)} for {len(texts)} queries"
