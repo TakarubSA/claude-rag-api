@@ -302,6 +302,8 @@ def chat(
     request: ChatRequest,
     authorization: str | None = Header(default=None),
 ):
+    logger.info("HEADERS: %s", {k: v for k, v in http_request.headers.items() if k.lower() != "authorization"})
+    logger.info("BODY: %s", request.model_dump())
     # 1. Validate Authorization.
     if authorization is None:
         raise HTTPException(
