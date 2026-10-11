@@ -293,6 +293,7 @@ def _light_clean(text: str) -> str:
 def rewrite_query(
     question: str,
     client_config: dict | None = None,
+    history: str = "",
 ) -> str:
     """
     Understand and rewrite the user's message for retrieval.
@@ -301,6 +302,7 @@ def rewrite_query(
     - typo correction
     - dialect normalization
     - intent preservation
+    - resolving references using conversation history
     - casual conversation detection
     - retrieval-friendly phrasing
 
@@ -315,6 +317,34 @@ def rewrite_query(
 
     client_profile = _build_client_profile(
         config
+    )
+
+    history = (history or "").strip()[-4000:]
+
+    history_block = (
+        f"""
+==================================================
+CONVERSATION HISTORY
+==================================================
+
+Use the history ONLY to resolve references in the user message
+(pronouns, omitted subjects, "how much", "is he a specialist",
+"هو", "كم سعره").
+
+- Replace the reference with the exact name/service/entity from
+  the history. This is the one case where you SHOULD make the
+  query more specific.
+- If the message answers a question the assistant asked, combine
+  both into one full query.
+- A reply to the assistant's question (yes / no / a name / a city)
+  is NOT casual conversation.
+- Copy names and terms exactly as written in the history.
+- Do not invent anything that is not in the history.
+
+{history}
+"""
+        if history
+        else ""
     )
 
     prompt = f"""
@@ -412,6 +442,7 @@ Do NOT:
 - invent entities
 - answer the question
 - make the question more specific than the user did
+  (except to resolve a reference using CONVERSATION HISTORY)
 
 If the user's wording is ambiguous, preserve the ambiguity.
 
@@ -493,7 +524,7 @@ client profile.
 
 The client profile describes the business domain.
 It is NOT permission to invent facts.
-
+{history_block}
 ==================================================
 USER MESSAGE
 ==================================================
@@ -1067,6 +1098,8 @@ NOT_ANSWERABLE
             return "NOT_ANSWERABLE"
 
     return "NOT_ANSWERABLE"
+
+
 # ----------------------------------------------------------------------
 # 5) Knowledge-gap classification
 # ----------------------------------------------------------------------
@@ -1219,18 +1252,6 @@ def generate_fallback_answer(
     )
 
     arabic = _is_arabic(question)
-
-    website_line_ar = (
-        f"\n{website_url}"
-        if website_url
-        else ""
-    )
-
-    website_line_en = (
-        f"\n{website_url}"
-        if website_url
-        else ""
-    )
 
     # --------------------------------------------------------------
     # Medical advice
