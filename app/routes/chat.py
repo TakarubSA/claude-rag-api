@@ -3,16 +3,23 @@ from pydantic import BaseModel
 
 from app.clients.repository import get_client_by_token
 from app.knowledge.gaps_repository import insert_gap
-from app.services.intent import classify_intent
+from app.services.intent import (
+    classify_intent,
+    has_lab_booking_details,
+    is_lab_booking_request,
+)
 from app.services.rag import answer_question
 
 
 router = APIRouter()
 
+# Hakeem Care tenant
+HAKEEM_CLIENT_ID = 1
+
 
 class ChatRequest(BaseModel):
     message: str
-    conversation_context: str | None = None
+    conversation_context: str = ""
 
 
 def chat_response(
@@ -33,7 +40,7 @@ def chat(
     request: ChatRequest,
     authorization: str | None = Header(default=None),
 ):
-    # 1. Validate Authorization
+    # 1. Validate Authorization header
     if authorization is None:
         raise HTTPException(
             status_code=401,
@@ -46,9 +53,10 @@ def chat(
             detail="Invalid authorization format",
         )
 
+    # 2. Extract token
     token = authorization[len("Bearer "):].strip()
 
-    # 2. Resolve token to client
+    # 3. Resolve token -> client
     client = get_client_by_token(token)
 
     if client is None:
@@ -60,8 +68,49 @@ def chat(
     message = request.message.strip()
     context = request.conversation_context or ""
 
-    # 3. Classify intent using the current message and
-    # recent conversation context.
+    # 4. Handle Hakeem Care Delta lab booking requests
+    # before RAG so retrieval cannot override this workflow.
+    if client.id == HAKEEM_CLIENT_ID:
+
+        # Customer provided name, age, and test.
+        # Transfer directly to an agent.
+        if has_lab_booking_details(message):
+            print(
+                "INTENT: handoff | REASON: lab booking details received"
+            )
+
+            return chat_response(
+                action="handoff",
+                answer=(
+                    "شكرًا لك، استلمنا البيانات المطلوبة 🌷\n\n"
+                    "سأحوّل محادثتك الآن إلى فريق خدمة العملاء "
+                    "لاستكمال إصدار رقم الحجز. يرجى الانتظار قليلًا."
+                ),
+            )
+
+        # Customer asks for a lab booking number but hasn't
+        # supplied the required information.
+        if is_lab_booking_request(message, context):
+            print(
+                "INTENT: reply | REASON: lab booking details needed"
+            )
+
+            return chat_response(
+                action="reply",
+                answer=(
+                    "أبشر، نساعدك في الحصول على رقم الحجز "
+                    "لتحاليل مختبرات دلتا 🌷\n\n"
+                    "فضلاً أرسل لنا المعلومات التالية:\n"
+                    "1. اسم صاحب التحليل.\n"
+                    "2. العمر.\n"
+                    "3. اسم التحليل أو قائمة التحاليل المطلوبة.\n\n"
+                    "بعد استلام البيانات، سنحوّل محادثتك إلى "
+                    "فريق خدمة العملاء لاستكمال إصدار رقم الحجز."
+                ),
+            )
+
+    # 5. Classify other requests.
+    # Pass context so follow-up messages can be interpreted correctly.
     intent = classify_intent(
         message,
         conversation_context=context,
@@ -70,27 +119,14 @@ def chat(
     print("CLIENT ID:", client.id)
     print("INTENT:", intent)
 
-    # 4. Handoff should not go through RAG.
-    if intent == "handoff":
-        print("HANDOFF: requested or collected information received")
-
-        return chat_response(
-            action="handoff",
-            answer=(
-                "شكرًا لك، استلمنا المعلومات المطلوبة. "
-                "سنحوّل محادثتك إلى فريق خدمة العملاء "
-                "لاستكمال طلبك. يرجى الانتظار قليلًا."
-            ),
-        )
-
-    # 5. Answer other requests using this client's knowledge base.
+    # 6. Answer using this client's knowledge base.
     result = answer_question(
         question=message,
         client_id=client.id,
         client_config=client.ai_config,
     )
 
-    # 6. Save knowledge gaps.
+    # 7. Save knowledge gaps.
     if result["status"] == "RELATED_BUT_UNKNOWN":
         insert_gap(
             client_id=client.id,
@@ -98,7 +134,7 @@ def chat(
             gap_type=result["status"],
         )
 
-    # 7. Return response.
+    # 8. Return response.
     return {
         "action": intent,
         "answer": result["answer"],
