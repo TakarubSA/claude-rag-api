@@ -84,45 +84,23 @@ def _clean_content(content: str) -> str:
     return content.strip()
 
 
-def _is_referential_follow_up(question: str) -> bool:
-    """Use history only when the latest message depends on an earlier subject."""
-    q = _clean_text(question).lower()
-    words = q.split()
-
-    # Short questions with pronouns/references need the previous subject.
-    reference_terms = (
-        "سعره", "سعرها", "بكم", "كم سعر", "احجزه", "احجزها",
-        "احجز", "حجزها", "حجزه", "كيف اقدر", "كيف أقدر",
-        "كيف احصل", "كيف أحصل", "وينه", "وينها", "هل هو",
-        "هل هي", "هذا", "هذه", "عليه", "عليها", "له", "لها",
-        "it", "that", "its", "how much", "where is it",
-    )
-    if len(words) <= 6 and any(term in q for term in reference_terms):
-        return True
-
-    # Very short fragments are commonly follow-ups; substantive questions
-    # should start a new topic and must not be anchored to old history.
-    return len(words) <= 3 and bool(re.search(
-        r"\\b(طيب|تمام|اوكي|يعني|ليش|متى|وين|كم)\\b", q
-    ))
-
-
 def _build_contextual_question(
     question: str,
     conversation_context: str | None,
 ) -> str:
-    """Attach history only for a clear short follow-up, not every new topic."""
+    """Explain how the latest message should be interpreted using history."""
     history = (conversation_context or "").strip()
 
-    if not history or not _is_referential_follow_up(question):
+    if not history:
         return question
 
     history = history[-MAX_HISTORY_CHARS:]
 
     return f"""
-Use the recent conversation ONLY to resolve the missing subject in the latest short follow-up.
-The latest user message has priority. Do not keep answering the previous topic if the latest
-message introduces a different subject or asks a complete standalone question.
+Use the recent conversation to understand the user's latest message.
+
+The conversation history is provided to resolve references, omitted
+subjects, follow-up questions, and the meaning of short replies.
 
 CONVERSATION HISTORY:
 {history}
@@ -132,14 +110,21 @@ LATEST USER MESSAGE:
 
 INSTRUCTIONS:
 - Answer the latest user message only.
-- Use history only to resolve references such as "سعره", "سعرها", "كيف أحجزها", or "وينه".
-- Do not assume the user is still discussing the old topic when the latest message is a new, complete question.
-- Treat prior assistant messages as conversation history, not independently verified business facts.
-- Verify business facts against the retrieved knowledge and client configuration.
-- Do not invent prices, qualifications, policies, or details.
+- Use the conversation history to resolve what words such as
+  "he", "it", "that service", "how much", and "is it a specialist"
+  refer to.
+- Do not repeat the previous answer unless it is necessary.
+- Treat prior assistant messages as conversation history, not as
+  independently verified business facts.
+- Use the retrieved knowledge and client configuration to verify
+  business facts.
+- Do not invent prices, qualifications, policies, or other details.
 - Never mention internal technical terms such as "السياق" or "المعلومات المسترجعة".
-- If the information is unavailable, say so simply and naturally.
-- Write in the user's language as plain text, without Markdown bold markers.
+- Speak naturally as a customer-service agent. If information is unavailable, say so simply without explaining internal system mechanics.
+- If the available knowledge does not answer the latest question,
+  say so clearly and direct the user to the appropriate support channel.
+- Write in the user's language.
+- Return plain text. Do not use Markdown bold markers or double asterisks.
 """.strip()
 
 
@@ -266,12 +251,14 @@ def _generate_grounded_answer(
     context: str,
     client_config: dict | None,
     best_distance=None,
+    history: str = "",
 ):
     """Answer only when retrieved knowledge/config supports the answer."""
     relevance = check_context_relevance(
         question=question,
         context=context,
         client_config=client_config,
+        history=history,
     )
 
     print("CONTEXT RELEVANCE:", relevance)
@@ -283,6 +270,7 @@ def _generate_grounded_answer(
         question=question,
         context=context,
         client_config=client_config,
+        history=history,
     )
 
     if not isinstance(answer, str) or not answer.strip():
@@ -333,16 +321,14 @@ def answer_question(
             "status": "EMPTY_QUESTION",
         }
 
-    # Use history to resolve short follow-up questions.
-    contextual_question = _build_contextual_question(
-        cleaned_question,
-        conversation_context,
-    )
+    # Keep the latest message and conversation history separate.
+    history = (conversation_context or "").strip()[-MAX_HISTORY_CHARS:]
 
-    # Rewrite the contextualized message into a retrieval query.
+    # Claude resolves references using history and creates a standalone search query.
     search_query = rewrite_query(
-        contextual_question,
+        cleaned_question,
         client_config=client_config,
+        history=history,
     )
 
     if not isinstance(search_query, str) or not search_query.strip():
@@ -428,13 +414,13 @@ def answer_question(
         default=None,
     )
 
-    # Relevance checking and answer generation receive the contextual question
-    # so the latest short message can be understood correctly.
+    # Claude gets the actual latest message and history as separate inputs.
     grounded_result = _generate_grounded_answer(
-        question=contextual_question,
+        question=cleaned_question,
         context=knowledge_context,
         client_config=client_config,
         best_distance=best_distance,
+        history=history,
     )
 
     if grounded_result:
@@ -446,9 +432,8 @@ def answer_question(
         )
         return grounded_result
 
-    # Use the same context-aware question for gap classification.
     gap_type = classify_knowledge_gap(
-        question=contextual_question,
+        question=cleaned_question,
         context=knowledge_context,
         client_config=client_config,
     )
@@ -456,7 +441,7 @@ def answer_question(
     print("KNOWLEDGE GAP:", gap_type)
 
     fallback = generate_fallback_answer(
-        question=contextual_question,
+        question=cleaned_question,
         gap_type=gap_type,
         client_config=client_config,
     )
