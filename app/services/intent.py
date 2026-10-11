@@ -135,49 +135,86 @@ def is_lab_booking_request(
 
 
 def has_lab_booking_details(message: str) -> bool:
-    """Check for patient name, age, and test in one or multiple lines."""
+    """
+    Accept booking details in either format:
+
+    عمار ٢٨ تحليل البول
+
+    or:
+
+    عمار
+    ٢٨
+    تحليل البول
+    """
     text = normalize_text(message)
 
-    if not text:
-        return False
-
-    # Find age, accepting Arabic or English digits.
+    # Find the age, accepting Arabic and English digits.
     age_match = re.search(r"(?<!\d)(\d{1,3})(?!\d)", text)
+
     if not age_match:
+        logger.info(
+            "Booking details incomplete: age not found. text=%r",
+            text,
+        )
         return False
 
     age = int(age_match.group(1))
+
     if not 1 <= age <= 120:
+        logger.info(
+            "Booking details incomplete: invalid age=%s",
+            age,
+        )
         return False
 
-    # Require a lab test or analysis.
-    test_markers = (
-        "تحليل", "تحاليل", "فحص", "فحوصات",
-        "اشعه", "test", "tests", "analysis",
-    )
-    if not any(marker in text for marker in test_markers):
-        return False
+    # Require a patient name before the age.
+    name_part = text[:age_match.start()].strip()
 
     ignored_words = {
-        "اسم", "صاحب", "التحليل", "العمر", "عمري",
-        "سنه", "سنوات", "عام", "اعوام", "رقم",
-        "الحجز", "حجز", "من", "فضلا", "الرجاء",
-        "تحليل", "تحاليل", "فحص", "فحوصات",
-        "السكر", "سكر", "الضغط", "ضغط", "الدهون",
-        "الدم", "الحمل", "دلتا", "مختبر", "مختبرات",
-        "اشعه", "test", "tests", "analysis",
-        "blood", "sugar", "pressure", "patient",
-        "name", "age",
+        "اسم", "صاحب", "التحليل", "تحليل", "تحاليل",
+        "العمر", "عمري", "عمر", "سنة", "سنه",
+        "سنوات", "عام", "اعوام", "المريض", "المريضة",
     }
 
-    words = re.findall(r"[\u0600-\u06FFA-Za-z]+", text)
-    name_tokens = [
-        word for word in words
+    name_words = re.findall(
+        r"[ء-يA-Za-z]+",
+        name_part,
+    )
+
+    patient_name = [
+        word for word in name_words
         if word not in ignored_words
     ]
 
-    return bool(name_tokens)
+    if not patient_name:
+        logger.info(
+            "Booking details incomplete: patient name not found. text=%r",
+            text,
+        )
+        return False
 
+    # Require an analysis/test name.
+    test_markers = (
+        "تحليل", "تحاليل", "فحص", "فحوصات",
+        "السكر", "سكر", "البول", "بول", "ابول",
+        "الضغط", "ضغط", "الدم", "الدهون",
+        "cbc", "urine", "glucose", "sugar",
+        "test", "tests", "analysis",
+    )
+
+    if not any(marker in text for marker in test_markers):
+        logger.info(
+            "Booking details incomplete: test not found. text=%r",
+            text,
+        )
+        return False
+
+    logger.info(
+        "Booking details complete: name=%s age=%s",
+        " ".join(patient_name),
+        age,
+    )
+    return True
 # --------------------------------------------------
 # Intent classifier
 # --------------------------------------------------
