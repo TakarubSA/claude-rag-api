@@ -169,8 +169,10 @@ def search_knowledge(
                 ELSE 0
             END AS rank_score
         FROM deduplicated
-        ORDER BY rank_score ASC, distance ASC
-        LIMIT :limit
+       ORDER BY keyword_hits DESC,
+       rank_score ASC,
+    distance ASC
+LIMIT :limit
     """)
 
     with engine.connect() as connection:

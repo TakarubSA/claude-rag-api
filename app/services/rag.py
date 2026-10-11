@@ -134,6 +134,41 @@ def _search_many(
 
 def _merge(*result_lists):
     """
+    Merge results from different query variants.
+    Prefer stronger lexical matches, then use rank score.
+    """
+    best = {}
+
+    def retrieval_order(result):
+        keyword_hits = int(
+            getattr(result, "keyword_hits", 0) or 0
+        )
+        score = getattr(
+            result,
+            "rank_score",
+            result.distance,
+        )
+
+        return (-keyword_hits, float(score))
+
+    for results in result_lists:
+        if not results:
+            continue
+
+        for result in results:
+            current = best.get(result.id)
+
+            if (
+                current is None
+                or retrieval_order(result) < retrieval_order(current)
+            ):
+                best[result.id] = result
+
+    return sorted(
+        best.values(),
+        key=retrieval_order,
+    )
+    """
     Merge results from semantic and lexical queries.
     Keep the best-ranked occurrence of each knowledge row.
     """
