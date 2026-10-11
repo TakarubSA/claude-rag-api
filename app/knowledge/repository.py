@@ -1,7 +1,33 @@
+import re
+
 from sqlalchemy import text
 
 from app.database.connection import engine
-import re
+
+
+_NORM = str.maketrans("إأآىة", "ااايه")
+
+_STOP = {
+    "هل", "ما", "ماذا", "كيف", "وين", "اين", "متي", "من", "في", "علي", "عن", "الي",
+    "ان", "او", "كم", "هو", "هي", "مع", "لا", "نعم", "عندكم", "عندك", "عندي",
+    "ابي", "ابغي", "اقدر", "يمكنني", "يمكن", "ممكن", "تقدمون", "لدي", "انا",
+    "هذا", "هذه", "فيه", "ليش", "وش", "ايش", "شو",
+}
+
+
+def _norm(s: str) -> str:
+    s = re.sub(r"[\u064B-\u0652\u0640]", "", s or "")
+    return s.translate(_NORM)
+
+
+def _tokens(s: str) -> list[str]:
+    out = []
+    for t in re.findall(r"\w+", _norm(s)):
+        if t.startswith("ال") and len(t) > 4:
+            t = t[2:]  # "التامين" -> "تامين"
+        if len(t) > 2 and t not in _STOP:
+            out.append(t)
+    return out
 
 
 def insert_knowledge(
@@ -33,13 +59,6 @@ def insert_knowledge(
         )
 
 
-
-_NORM = str.maketrans("إأآىة", "ااايه")
-def _norm(s: str) -> str:
-    s = re.sub(r"[\u064B-\u0652\u0640]", "", s or "")
-    return s.translate(_NORM)
-
-
 def search_knowledge(
     query_embedding: list[float],
     client_id: int,
@@ -47,10 +66,9 @@ def search_knowledge(
     query_text: str | None = None,
 ):
     """Hybrid retrieval (vector + keyword, fused with RRF), isolated by client_id."""
-    tokens = re.findall(r"\w+", _norm(query_text))
-    ts_query = " | ".join(tokens) or "''"
+    ts_query = " | ".join(_tokens(query_text)) or "''"
 
-    query = text("""
+    query = text(r"""
         WITH sem AS (
             SELECT id,
                    ROW_NUMBER() OVER (ORDER BY embedding <=> CAST(:e AS vector)) AS rnk
@@ -65,9 +83,11 @@ def search_knowledge(
             FROM (
                 SELECT id,
                        to_tsvector('simple',
-                           translate(
-                               regexp_replace(content, '[\u064B-\u0652\u0640]', '', 'g'),
-                               'إأآىة', 'ااايه')) AS d
+                           regexp_replace(
+                               translate(
+                                   regexp_replace(content, '[\u064B-\u0652\u0640]', '', 'g'),
+                                   'إأآىة', 'ااايه'),
+                               '\mال(?=\w{3})', '', 'g')) AS d
                 FROM knowledge
                 WHERE client_id = :c
             ) t, to_tsquery('simple', :q) q
@@ -91,27 +111,3 @@ def search_knowledge(
             query,
             {"e": str(query_embedding), "c": client_id, "n": limit, "q": ts_query},
         ).fetchall()
-    """Semantic-only retrieval, isolated by client_id."""
-
-    query = text("""
-        SELECT
-            id,
-            content,
-            embedding <=> CAST(:embedding AS vector) AS distance
-        FROM knowledge
-        WHERE client_id = :client_id
-        ORDER BY embedding <=> CAST(:embedding AS vector)
-        LIMIT :limit
-    """)
-
-    with engine.connect() as connection:
-        result = connection.execute(
-            query,
-            {
-                "embedding": str(query_embedding),
-                "client_id": client_id,
-                "limit": limit,
-            },
-        )
-
-        return result.fetchall()

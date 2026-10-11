@@ -1133,6 +1133,7 @@ judgment such as:
 - medication dosage
 - treatment recommendation
 - interpretation requiring personal medical judgment
+- asking whether they can take/use a specific medication
 
 This category is not dependent on any particular client.
 
@@ -1182,9 +1183,6 @@ USER QUESTION
         }:
             return result
 
-    # Safe default:
-    # treat uncertainty as a knowledge gap rather than pretending
-    # the user is out of scope.
     return "RELATED_BUT_UNKNOWN"
 
 

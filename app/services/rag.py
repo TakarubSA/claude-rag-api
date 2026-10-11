@@ -16,6 +16,7 @@ from app.llm.claude import (
 CASUAL_MARKER = "__CASUAL_CONVERSATION__"
 SEARCH_LIMIT = 20
 CONTEXT_LIMIT = 6
+MAX_DISTANCE = 0.65  # drop rows semantically too far; tune with logs
 
 # Keep disabled until retrieval quality is tested properly.
 USE_RERANK = False
@@ -83,8 +84,6 @@ def _merge(*result_lists):
     best: dict[Any, Any] = {}
 
     def retrieval_order(result):
-        # rank_score already combines semantic distance with bounded lexical
-        # evidence. It must be primary; keyword count is only a tie-breaker.
         score = getattr(result, "rank_score", result.distance)
         keyword_hits = int(getattr(result, "keyword_hits", 0) or 0)
         distance = float(result.distance)
@@ -143,7 +142,6 @@ def _build_context(results) -> str:
         if not content:
             continue
 
-        # Deduplicate identical content without changing the source records.
         dedupe_key = re.sub(r"\s+", " ", content).strip().casefold()
         if dedupe_key in seen:
             continue
@@ -204,8 +202,6 @@ def answer_question(
             "status": "EMPTY_QUESTION",
         }
 
-    # Query rewriting helps retrieval, while the cleaned original is retained
-    # as a second query so important terms are not lost during rewriting.
     search_query = rewrite_query(
         cleaned_question,
         client_config=client_config,
@@ -229,7 +225,6 @@ def answer_question(
                 "best_distance": None,
                 "status": "CASUAL",
             }
-        # Do not return an empty answer if the casual-answer call failed.
         search_query = cleaned_question
 
     texts = [search_query]
@@ -243,13 +238,15 @@ def answer_question(
         print("RETRIEVAL UNAVAILABLE: continuing with client configuration.")
         result_lists = []
 
-    results = _merge(*result_lists)
+    results = [
+        r for r in _merge(*result_lists)
+        if float(r.distance) <= MAX_DISTANCE
+    ]
 
     if results:
         results = _rerank(search_query, results)
         results = results[:CONTEXT_LIMIT]
 
-    # Useful diagnostics for tuning retrieval in production.
     if results:
         for result in results:
             print("ID:", result.id)
@@ -266,7 +263,6 @@ def answer_question(
     print(context if context else "[empty]")
     print("========================================\n")
 
-    # Preserve a true best semantic distance even if hybrid ranking reorders rows.
     best_distance = min(
         (float(result.distance) for result in results),
         default=None,

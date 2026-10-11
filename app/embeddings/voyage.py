@@ -49,26 +49,3 @@ def create_embeddings(
             time.sleep(21)
 
     return all_embeddings
-    all_embeddings = []
-
-    for i in range(0, len(texts), batch_size):
-        batch = texts[i:i + batch_size]
-
-        print(
-            f"Embedding batch "
-            f"{i + 1}-{min(i + batch_size, len(texts))} "
-            f"of {len(texts)}"
-        )
-
-        result = client.embed(
-            batch,
-            model="voyage-4",
-            input_type="document",
-        )
-
-        all_embeddings.extend(result.embeddings)
-
-        if i + batch_size < len(texts):
-            time.sleep(21)
-
-    return all_embeddings
