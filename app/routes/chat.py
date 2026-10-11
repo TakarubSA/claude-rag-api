@@ -3,7 +3,7 @@ from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, ConfigDict
-
+from fastapi import APIRouter, Header, HTTPException, Request
 from app.clients.repository import get_client_by_token
 from app.knowledge.gaps_repository import insert_gap
 from app.services.intent import classify_intent
