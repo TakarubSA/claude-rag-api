@@ -1,17 +1,12 @@
-import json
 import logging
-import re
+from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 
 from app.clients.repository import get_client_by_token
 from app.knowledge.gaps_repository import insert_gap
-from app.services.intent import (
-    classify_intent,
-    is_lab_booking_request,
-    normalize_text,
-)
+from app.services.intent import classify_intent
 from app.services.rag import answer_question
 
 
@@ -21,220 +16,127 @@ logger = logging.getLogger(__name__)
 
 class ChatRequest(BaseModel):
     message: str
-    conversation_context: str = ""
+    conversation_context: Any = None
 
 
-# --------------------------------------------------
-# Tenant configuration
-# --------------------------------------------------
-
-def get_booking_flow_config(client_config) -> dict:
+def format_conversation_context(value: Any) -> str:
     """
-    Read the booking workflow configuration for any tenant.
+    Normalize conversation history into readable text.
 
-    Expected ai_config structure:
-    {
-        "booking_number_flow": {
-            "enabled": true
-        }
-    }
+    Supports:
+    - plain strings
+    - lists of message dictionaries
+    - dictionaries containing messages/history/turns
+    - OpenAI-style content arrays
     """
-    if isinstance(client_config, str):
-        try:
-            client_config = json.loads(client_config)
-        except (json.JSONDecodeError, TypeError):
-            logger.warning("Invalid client ai_config JSON.")
-            return {}
+    if value is None:
+        return ""
 
-    if not isinstance(client_config, dict):
-        return {}
+    if isinstance(value, str):
+        return value[-8000:]
 
-    flow_config = client_config.get(
-        "booking_number_flow",
-        {},
-    )
+    if isinstance(value, dict):
+        for key in ("messages", "history", "turns"):
+            if key in value:
+                return format_conversation_context(value[key])
 
-    if not isinstance(flow_config, dict):
-        return {}
+        role = (
+            value.get("role")
+            or value.get("sender")
+            or value.get("type")
+            or "message"
+        )
 
-    return flow_config
+        content = (
+            value.get("content")
+            or value.get("message")
+            or value.get("text")
+            or ""
+        )
 
+        if isinstance(content, list):
+            parts = []
+            for part in content:
+                if isinstance(part, dict):
+                    parts.append(
+                        str(
+                            part.get("text")
+                            or part.get("content")
+                            or ""
+                        )
+                    )
+                else:
+                    parts.append(str(part))
 
-# --------------------------------------------------
-# Response helper
-# --------------------------------------------------
+            content = " ".join(parts)
+
+        return f"{role}: {content}"[-8000:]
+
+    if isinstance(value, list):
+        lines = []
+
+        for item in value[-20:]:
+            if isinstance(item, dict):
+                role = (
+                    item.get("role")
+                    or item.get("sender")
+                    or item.get("type")
+                    or "message"
+                )
+
+                content = (
+                    item.get("content")
+                    or item.get("message")
+                    or item.get("text")
+                    or ""
+                )
+
+                if isinstance(content, list):
+                    parts = []
+                    for part in content:
+                        if isinstance(part, dict):
+                            parts.append(
+                                str(
+                                    part.get("text")
+                                    or part.get("content")
+                                    or ""
+                                )
+                            )
+                        else:
+                            parts.append(str(part))
+
+                    content = " ".join(parts)
+
+                lines.append(f"{role}: {content}")
+
+            else:
+                lines.append(str(item))
+
+        return "\n".join(lines)[-8000:]
+
+    return str(value)[-8000:]
+
 
 def make_response(
     action: str,
     answer: str,
     status: str = "KNOWN",
+    best_distance=None,
 ):
     return {
         "action": action,
         "answer": answer,
-        "best_distance": None,
+        "best_distance": best_distance,
         "status": status,
     }
 
-
-# --------------------------------------------------
-# Booking-number detection
-# --------------------------------------------------
-
-def is_booking_number_request(message: str) -> bool:
-    """
-    Detect booking-number requests, including messages that
-    do not explicitly mention a laboratory.
-    """
-    text = normalize_text(message)
-
-    booking_phrases = (
-        "رقم الحجز",
-        "رقم حجز",
-        "رقم حجزي",
-        "رقم الحجوز",
-        "احتاج رقم الحجز",
-        "ابغى رقم الحجز",
-        "ابي رقم الحجز",
-        "اريد رقم الحجز",
-        "ما وصلني رقم الحجز",
-        "وين رقم الحجز",
-        "booking number",
-        "booking reference",
-        "booking no",
-        "booking id",
-        "reservation number",
-    )
-
-    if any(
-        phrase in text
-        for phrase in booking_phrases
-    ):
-        return True
-
-    return (
-        "رقم" in text
-        and any(
-            word in text
-            for word in (
-                "حجز",
-                "الحجز",
-                "حجزي",
-                "حجوز",
-            )
-        )
-    )
-
-
-# --------------------------------------------------
-# Booking-details detection
-# --------------------------------------------------
-
-def has_lab_booking_details(message: str) -> bool:
-    """
-    Detect all three required details in a single message:
-    - Patient name
-    - Age
-    - Test name
-
-    Supports Arabic digits, English digits, and multiline text.
-    """
-    text = normalize_text(message)
-
-    # Find the age.
-    age_match = re.search(
-        r"(?<!\d)(\d{1,3})(?!\d)",
-        text,
-    )
-
-    if not age_match:
-        return False
-
-    age = int(age_match.group(1))
-
-    if not 1 <= age <= 120:
-        return False
-
-    # The patient name is expected before the age.
-    name_part = text[:age_match.start()].strip()
-
-    name_words = re.findall(
-        r"[ء-يA-Za-z]+",
-        name_part,
-    )
-
-    ignored_name_words = {
-        "اسم",
-        "صاحب",
-        "التحليل",
-        "تحليل",
-        "تحاليل",
-        "العمر",
-        "عمري",
-        "عمر",
-        "سنة",
-        "سنوات",
-        "سنه",
-        "عام",
-        "اعوام",
-        "الرجاء",
-        "فضلا",
-        "من",
-        "المريض",
-        "المريضه",
-    }
-
-    patient_name_words = [
-        word
-        for word in name_words
-        if word not in ignored_name_words
-    ]
-
-    if not patient_name_words:
-        return False
-
-    # Check whether a test or analysis is mentioned.
-    test_markers = (
-        "تحليل",
-        "تحاليل",
-        "فحص",
-        "فحوصات",
-        "السكر",
-        "سكر",
-        "الضغط",
-        "ضغط",
-        "البول",
-        "بول",
-        "ابول",
-        "الدم",
-        "البراز",
-        "cbc",
-        "urine",
-        "glucose",
-        "sugar",
-        "pressure",
-        "blood test",
-        "analysis",
-        "test",
-        "tests",
-    )
-
-    return any(
-        marker in text
-        for marker in test_markers
-    )
-
-
-# --------------------------------------------------
-# Main chat endpoint
-# --------------------------------------------------
 
 @router.post("/chat")
 def chat(
     request: ChatRequest,
     authorization: str | None = Header(default=None),
 ):
-    # 1. Validate Authorization header.
+    # 1. Validate Authorization.
     if authorization is None:
         raise HTTPException(
             status_code=401,
@@ -247,10 +149,9 @@ def chat(
             detail="Invalid authorization format",
         )
 
-    # 2. Extract token.
     token = authorization[len("Bearer "):].strip()
 
-    # 3. Resolve token -> client.
+    # 2. Resolve token to the client.
     client = get_client_by_token(token)
 
     if client is None:
@@ -260,128 +161,58 @@ def chat(
         )
 
     message = request.message.strip()
-    context = request.conversation_context or ""
 
-    # Read workflow settings for this tenant.
-    flow_config = get_booking_flow_config(
-        client.ai_config
-    )
-
-    booking_flow_enabled = (
-        flow_config.get("enabled") is True
-    )
-    
-    logger.warning(
-    "[BOOKING DEBUG] client_id=%s flow_enabled=%s "
-    "details_detected=%s booking_request=%s message_length=%s",
-    client.id,
-    booking_flow_enabled,
-    has_lab_booking_details(message),
-    (
-        is_booking_number_request(message)
-        or is_lab_booking_request(message, context)
-    ),
-    len(message),
-)
-
-    logger.info(
-        "Chat request received for client_id=%s",
-        client.id,
-    )
-
-    # --------------------------------------------------
-    # 4. Configurable booking-number workflow
-    # --------------------------------------------------
-
-    if booking_flow_enabled:
-
-        # First: customer has submitted name, age, and test.
-        # Return handoff without calling RAG or Claude.
-        if has_lab_booking_details(message):
-            logger.info(
-                "Booking details detected; returning handoff "
-                "for client_id=%s",
-                client.id,
-            )
-
-            return make_response(
-                action="handoff",
-                answer=(
-                    "شكرًا لك، استلمنا البيانات المطلوبة 🌷\n\n"
-                    "سنحوّل محادثتك إلى فريق خدمة العملاء "
-                    "لاستكمال إصدار رقم الحجز. يرجى الانتظار."
-                ),
-            )
-
-        # Second: customer asks for a booking number.
-        # Ask for the required details first.
-        booking_request = (
-            is_booking_number_request(message)
-            or is_lab_booking_request(
-                message,
-                context,
-            )
+    if not message:
+        return make_response(
+            action="reply",
+            answer="فضلاً اكتب رسالتك حتى أتمكن من مساعدتك.",
+            status="EMPTY_QUESTION",
         )
 
-        if booking_request:
-            logger.info(
-                "Booking details requested from customer; "
-                "client_id=%s",
-                client.id,
-            )
-
-            return make_response(
-                action="reply",
-                answer=(
-                    "أبشر، نساعدك في الحصول على رقم الحجز 🌷\n\n"
-                    "فضلاً أرسل لنا البيانات التالية:\n"
-                    "1. اسم صاحب التحليل.\n"
-                    "2. العمر.\n"
-                    "3. اسم التحليل أو قائمة التحاليل المطلوبة.\n\n"
-                    "بعد استلام البيانات، سنحوّل محادثتك إلى "
-                    "فريق خدمة العملاء لاستكمال إصدار رقم الحجز."
-                ),
-            )
-
-    # --------------------------------------------------
-    # 5. Classify all other requests
-    # --------------------------------------------------
-
-    intent = classify_intent(
-        message,
-        conversation_context=context,
+    # 3. Normalize context received from ChatGate.
+    conversation_context = format_conversation_context(
+        request.conversation_context
     )
 
     logger.info(
-        "Intent classified as %s for client_id=%s",
-        intent,
+        "Chat request received: client_id=%s context_received=%s context_chars=%s",
         client.id,
+        bool(conversation_context),
+        len(conversation_context),
     )
 
-    # Do not call RAG for handoff responses.
+    # 4. Classify the latest message using conversation history.
+    intent = classify_intent(
+        message=message,
+        conversation_context=conversation_context,
+    )
+
+    logger.info(
+        "Intent classified: client_id=%s intent=%s",
+        client.id,
+        intent,
+    )
+
+    # 5. Handoff responses must bypass RAG.
     if intent == "handoff":
         return make_response(
             action="handoff",
             answer=(
-                "سأحوّل محادثتك إلى فريق خدمة العملاء "
-                "لمساعدتك. يرجى الانتظار."
+                "شكرًا لك، استلمنا المعلومات المطلوبة. "
+                "سيتم تحويل محادثتك إلى فريق خدمة العملاء "
+                "لمتابعة طلبك. يرجى الانتظار."
             ),
         )
 
-    # --------------------------------------------------
-    # 6. Answer using this tenant's knowledge base
-    # --------------------------------------------------
-
+    # 6. Answer using this client's isolated knowledge base.
     result = answer_question(
         question=message,
         client_id=client.id,
         client_config=client.ai_config,
+        conversation_context=conversation_context,
     )
 
-    # --------------------------------------------------
-    # 7. Save knowledge gaps
-    # --------------------------------------------------
-
+    # 7. Record knowledge gaps.
     if result["status"] == "RELATED_BUT_UNKNOWN":
         insert_gap(
             client_id=client.id,
@@ -389,13 +220,10 @@ def chat(
             gap_type=result["status"],
         )
 
-    # --------------------------------------------------
-    # 8. Return response
-    # --------------------------------------------------
-
-    return {
-        "action": intent,
-        "answer": result["answer"],
-        "best_distance": result["best_distance"],
-        "status": result["status"],
-    }
+    # 8. Return response.
+    return make_response(
+        action=intent,
+        answer=result["answer"],
+        status=result["status"],
+        best_distance=result["best_distance"],
+    )
