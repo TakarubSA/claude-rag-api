@@ -1,21 +1,28 @@
 import os
 import re
+import logging
 
 import anthropic
 from dotenv import load_dotenv
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 client = anthropic.Anthropic(
     api_key=os.getenv("ANTHROPIC_API_KEY")
 )
 
 
+# --------------------------------------------------
+# Text normalization
+# --------------------------------------------------
+
 def normalize_text(text: str) -> str:
-    """Normalize Arabic and English text for reliable keyword matching."""
+    """Normalize Arabic text and digits for matching."""
     text = (text or "").lower()
 
-    # Normalize Arabic-Indic and Persian digits.
+    # Convert Arabic and Persian digits to English digits.
     text = text.translate(
         str.maketrans(
             "٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹",
@@ -38,115 +45,285 @@ def normalize_text(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-def is_lab_booking_handoff(
+# --------------------------------------------------
+# Delta Laboratories booking flow
+# --------------------------------------------------
+
+LAB_MARKERS = (
+    "دلتا",
+    "delta",
+    "مختبر",
+    "مختبرات",
+    "المختبر",
+    "تحاليل",
+    "تحليل",
+    "فحص",
+    "فحوصات",
+    "laboratory",
+    "laboratories",
+    "lab",
+)
+
+BOOKING_MARKERS = (
+    "رقم الحجز",
+    "رقم حجز",
+    "رقم حجزي",
+    "رقم الحجوز",
+    "حجز التحاليل",
+    "حجز تحاليل",
+    "booking number",
+    "booking reference",
+    "booking no",
+    "booking id",
+    "reservation number",
+    "my booking",
+)
+
+DETAIL_REQUEST_MARKERS = (
+    "اسم صاحب التحليل",
+    "اسم التحليل",
+    "قائمة التحاليل المطلوبة",
+)
+
+
+def is_lab_booking_request(
     message: str,
     conversation_context: str = "",
 ) -> bool:
     """
-    Route laboratory booking-number requests directly to an agent.
+    Detect a laboratory booking-number workflow.
 
-    conversation_context should contain recent conversation messages,
-    not the entire knowledge-base context.
+    Pass recent conversation messages as conversation_context.
+    Do not pass the knowledge-base documents as conversation history.
     """
-    text = normalize_text(
-        f"{conversation_context}\n{message}"
+    msg = normalize_text(message)
+    context = normalize_text(conversation_context)
+    combined = f"{context}\n{msg}"
+
+    has_lab_reference = any(
+        marker in combined for marker in LAB_MARKERS
     )
 
-    lab_terms = (
+    has_booking_reference = any(
+        marker in combined for marker in BOOKING_MARKERS
+    )
+
+    # Catch common variants such as "رقم الحجز" and "رقم حجزي".
+    if not has_booking_reference:
+        has_booking_reference = (
+            "رقم" in combined
+            and any(
+                word in combined
+                for word in ("حجز", "الحجز", "حجزي", "حجوز")
+            )
+        )
+
+    # Detect a conversation where the bot already asked
+    # for the patient's name, age, and test.
+    bot_requested_details = (
+        any(marker in context for marker in DETAIL_REQUEST_MARKERS)
+        and any(marker in context for marker in LAB_MARKERS)
+        and (
+            any(marker in context for marker in BOOKING_MARKERS)
+            or "اصدار رقم الحجز" in context
+        )
+    )
+
+    return (
+        has_lab_reference and has_booking_reference
+    ) or bot_requested_details
+
+
+def has_lab_booking_details(message: str) -> bool:
+    """
+    Basic validation that the customer's message contains:
+    a name, a plausible age, and a test name.
+
+    This is a lightweight heuristic, not a full entity extractor.
+    """
+    text = normalize_text(message)
+
+    # Find an age between 1 and 120.
+    age_match = re.search(r"(?<!\d)(\d{1,3})(?!\d)", text)
+
+    if not age_match:
+        return False
+
+    age = int(age_match.group(1))
+
+    if not 1 <= age <= 120:
+        return False
+
+    # Check that a test or analysis is mentioned.
+    test_markers = (
+        "تحليل",
+        "تحاليل",
+        "فحص",
+        "فحوصات",
+        "test",
+        "tests",
+        "analysis",
+        "blood test",
+    )
+
+    has_test = any(marker in text for marker in test_markers)
+
+    if not has_test:
+        return False
+
+    # Remove common labels and test words before checking
+    # whether any likely name tokens remain.
+    ignored_words = {
+        "اسم",
+        "صاحب",
+        "التحليل",
+        "العمر",
+        "عمري",
+        "سنه",
+        "سنوات",
+        "سنة",
+        "عام",
+        "اعوام",
+        "رقم",
+        "الحجز",
+        "حجز",
+        "من",
+        "فضلا",
+        "الرجاء",
+        "تحليل",
+        "تحاليل",
+        "فحص",
+        "فحوصات",
+        "السكر",
+        "سكر",
+        "الضغط",
+        "ضغط",
+        "الدهون",
+        "الدم",
+        "الحمل",
         "دلتا",
-        "delta",
         "مختبر",
         "مختبرات",
-        "المختبر",
-        "تحاليل",
-        "تحليل",
-        "laboratory",
-        "laboratories",
-        "lab",
+        "test",
+        "tests",
+        "analysis",
+        "blood",
+        "sugar",
+        "pressure",
+    }
+
+    words = re.findall(
+        r"[\u0600-\u06FFA-Za-z]+",
+        text,
     )
 
-    booking_terms = (
-        "رقم الحجز",
-        "رقم حجز",
-        "رقم الحجوز",
-        "حجز التحاليل",
-        "حجز تحاليل",
-        "booking number",
-        "booking reference",
-        "booking no",
-        "booking id",
-        "reservation number",
-        "booking code",
-    )
+    meaningful_words = [
+        word for word in words
+        if word not in ignored_words
+        and not word.isdigit()
+    ]
 
-    has_lab_context = any(term in text for term in lab_terms)
-    asks_for_booking_number = any(
-        term in text for term in booking_terms
-    )
+    has_name = bool(meaningful_words)
 
-    return has_lab_context and asks_for_booking_number
+    return has_name
 
+
+# --------------------------------------------------
+# Intent classifier
+# --------------------------------------------------
 
 def classify_intent(
     message: str,
     conversation_context: str = "",
 ) -> str:
-    # Rule 1: Lab booking-number requests always go to an agent.
-    # Do not let the model classify these requests as "api".
-    if is_lab_booking_handoff(message, conversation_context):
-        return "handoff"
+    """
+    Return exactly one action:
+    reply, api, or handoff.
 
+    Delta booking behavior:
+    - Booking-number request without all required details -> reply.
+    - The customer provides the details in an active booking flow
+      -> handoff.
+    """
+
+    # Rule 1: Handle Delta/lab booking requests deterministically.
+    # This check runs before Claude so that Claude cannot override it.
+    if is_lab_booking_request(message, conversation_context):
+        if has_lab_booking_details(message):
+            logger.info(
+                "Intent classified as handoff: lab booking details received."
+            )
+            return "handoff"
+
+        logger.info(
+            "Intent classified as reply: lab booking details are needed."
+        )
+        return "reply"
+
+    # Rule 2: Classify all other intents using Claude.
     prompt = f"""
-Classify the user's message into exactly ONE action:
+Classify the user's message into exactly ONE of these actions:
 
 reply
 api
 handoff
 
-IMPORTANT BUSINESS RULE — Hakeem Care / Delta Laboratories:
-
-Requests for laboratory booking numbers must be routed to handoff
-when the message or recent conversation context indicates that the
-request concerns laboratory tests or Delta Laboratories.
-
-Examples:
-- ابغى رقم الحجز انا في المختبر
-- ما وصلني رقم حجز التحاليل
-- حجزت تحاليل دلتا وابغى الرقم
-- وين رقم حجز مختبرات دلتا؟
-- I need my lab booking number.
-- I am at the lab and haven't received my booking number.
-
-For these requests, return handoff, NOT api.
-A staff member will collect the patient's name, age, and test name,
-then handle issuing the booking number.
-Do not ask the user to provide those details before handoff.
+Definitions:
 
 reply:
-Use for general information answerable from the knowledge base,
-greetings, and general conversation.
+Use this when the user is asking for general information that can be
+answered using the knowledge base, or when the user is greeting
+or starting a conversation.
+
+Examples:
+- كيف أحجز موعد؟
+- ايش طرق الدفع؟
+- وين موقع العيادة؟
+- هل أقدر أغير موعدي؟
+- السلام عليكم
+- مرحبا
+- صباح الخير
+- كيف حالك؟
 
 api:
-Use when the system must perform an operation or retrieve specific
-live information from an external system/API, except for the
-laboratory booking-number workflow defined above.
+Use this when the user wants the system to perform an operation,
+check live data, retrieve specific information, or interact with
+an external system/API.
+
+IMPORTANT:
+A request for specific live information may be api even if it is phrased
+as a question, unless it is a laboratory booking-number request that
+must be routed to a human agent.
+
+Examples:
+- هل رحلتي 12345 صار فيها نداء؟
+- شيك على رحلتي 12345
+- وين طلبي 98765؟
+- شيك على موعدي 4567
+- هل الطلب 12345 تم شحنه؟
+- ابحث عن فاتورتي 12345
 
 handoff:
-Use when the user explicitly or implicitly needs a human agent,
-customer service representative, employee, or specialist.
+Use this when the user explicitly or implicitly wants to speak
+with a real human agent, customer service representative,
+employee, or specialist.
 
 Examples:
 - أبغى أكلم موظف
+- أريد التحدث مع موظف
 - حولني لموظف
 - أبغى خدمة العملاء
 - ممكن أكلم شخص حقيقي؟
-- عندي مشكلة وأحتاج موظف يساعدني
+- أريد التحدث مع شخص
+- احتاج موظف يساعدني
+- حولني لأحد الموظفين
+- أبغى أكلم الدعم
+- ما أبغى أكمل مع البوت
 
 Priority rules:
-1. Delta/laboratory booking-number request -> handoff.
-2. Explicit or implicit request for a human agent -> handoff.
-3. Other requests requiring live or external data -> api.
-4. Otherwise -> reply.
+1. Explicit or implicit request for a human agent -> handoff.
+2. Requests for live or external data -> api.
+3. Otherwise -> reply.
 
 Recent conversation context:
 {conversation_context or "(none supplied)"}
@@ -160,26 +337,34 @@ api
 handoff
 """
 
-    response = client.messages.create(
-        model="claude-sonnet-5-5",
-        max_tokens=10,
-        messages=[
-            {
-                "role": "user",
-                "content": prompt,
-            }
-        ],
-    )
+    try:
+        response = client.messages.create(
+            model="claude-sonnet-5-5",
+            max_tokens=10,
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt,
+                }
+            ],
+        )
 
-    for block in response.content:
-        if hasattr(block, "text") and block.text:
-            result = block.text.strip().lower()
+        for block in response.content:
+            if hasattr(block, "text") and block.text:
+                result = block.text.strip().lower()
 
-            if result in {"reply", "api", "handoff"}:
-                return result
+                if result in {"reply", "api", "handoff"}:
+                    return result
 
-            print("Unexpected Claude classification:", result)
-            return "reply"
+                logger.warning(
+                    "Unexpected Claude classification: %s",
+                    result,
+                )
+                return "reply"
 
-    print("Claude returned no text block.")
-    return "reply"
+        logger.warning("Claude returned no text block.")
+        return "reply"
+
+    except Exception:
+        logger.exception("Intent classification failed.")
+        return "reply"
