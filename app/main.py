@@ -1,4 +1,3 @@
-```python
 import logging
 
 from fastapi import FastAPI, Request
@@ -20,7 +19,6 @@ async def validation_exception_handler(
     request: Request,
     exc: RequestValidationError,
 ):
-    # Log validation errors without logging tokens or message contents.
     errors = [
         {
             "loc": error.get("loc"),
@@ -44,4 +42,3 @@ async def validation_exception_handler(
 
 app.include_router(chat_router)
 app.include_router(knowledge_router)
-```
