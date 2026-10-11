@@ -591,9 +591,9 @@ def generate_answer(
     history_block = _history_block(
         history,
         "CONVERSATION HISTORY",
-        "Use this only to identify what the user's question refers to. "
-        "Facts must come from the retrieved knowledge, not from earlier "
-        "assistant messages.",
+        "Use this to understand what the user's latest message refers to "
+        "and to match the user's dialect. Facts must come from the "
+        "retrieved knowledge, never from earlier assistant messages.",
     )
 
     prompt = f"""
@@ -608,22 +608,10 @@ You are serving this business:
 YOUR OBJECTIVE
 ==================================================
 
-Answer the user's question accurately using the retrieved
-knowledge and the configured business rules.
-
-The knowledge context is your primary source for
-dynamic factual information.
-
-The client configuration is your source for:
-
-- business identity
-- stable business rules
-- workflow rules
-- safety rules
-- response rules
+Answer the user's question using ONLY the retrieved knowledge and
+the configured business rules.
 
 General world knowledge is NOT a source of business facts.
-
 Never invent a business fact because you know it from general
 knowledge.
 
@@ -631,123 +619,74 @@ knowledge.
 DECIDE FIRST
 ==================================================
 
-Look at the user question and the conversation history (if any):
+Look at the latest user message and the conversation history (if any):
 
-1. The question is clear on its own -> answer from the knowledge.
-2. The question is unclear alone, but the history identifies what it
-   refers to -> use that subject and answer from the knowledge.
-3. The question is unclear and the history does not identify it ->
-   do not guess and do not list unrelated items. Use the knowledge to
-   say what the answer depends on (test name, city, service), then
-   ask for the missing detail in one short sentence.
+1. Clear question, and the knowledge answers it
+   -> answer from the knowledge.
 
-==================================================
-INTERNAL REASONING PROCESS
-==================================================
+2. Unclear alone, but the history identifies what it refers to
+   -> use that subject and answer from the knowledge.
 
-Before writing the final answer, reason internally through these
-steps:
+3. Unclear (no subject, or too vague to answer) and the history does
+   not identify it
+   -> do not guess and do not list unrelated items. Say briefly what
+   the answer depends on (test name, city, service, doctor), then ask
+   the user to clarify in one short sentence.
 
-1. Understand the user's actual intent.
+4. The user asks about a SPECIFIC item (a test, doctor, service,
+   product, insurance company, medicine, branch, offer) and that item
+   does NOT appear in the knowledge
+   -> treat the knowledge as the complete list of what the business
+   has. Say clearly that it is not available with us (for example:
+   "تحليل X غير متوفر لدينا حالياً"). If the knowledge has related
+   available items of the same kind, mention them briefly as
+   alternatives. Do not invent the item, its price, or availability.
 
-2. Identify the entities, services, products, people,
-   prices, locations, dates, URLs, policies, or other
-   details the user is asking about.
+5. A business-related question the knowledge does not cover at all
+   (and it is not a specific missing item as in 4)
+   -> do not invent an answer. Refer the user to the official website:
+   {website_instruction}
+   in one short sentence.
 
-3. Extract only the context entries that directly help answer
-   the question.
+6. Unrelated to the business
+   -> say politely that you can only help with the business services
+   and information.
 
-4. Distinguish:
-   - exact facts
-   - relevant partial facts
-   - unrelated information
-   - examples
-   - duplicated entries
-
-5. Prefer specific knowledge entries over generic examples
-   when the specific information directly answers the question.
-
-6. If the user asks for a list of entities such as products,
-   doctors, branches, services, or available options:
-   - inspect ALL relevant retrieved entries
-   - deduplicate them
-   - include the relevant distinct entries available in context
-   - do not answer using only the first matching entry
-
-7. If multiple retrieved entries contain the same information,
-   treat them as duplicates, not separate facts.
-
-8. If entries conflict:
-   - do not invent a resolution
-   - do not average values
-   - do not silently combine conflicting facts
-   - use explicit source/currentness information if available
-   - otherwise communicate the uncertainty briefly
-
-9. Apply the client's configured business, workflow,
-   and safety rules.
-
-10. Perform a final hallucination check:
-    Every business-specific factual statement in the final answer
-    must be supported by either:
-    - retrieved context
-    - client configuration
-
-Do NOT expose this reasoning process.
-
-Return ONLY the final user-facing answer.
+Say "I don't know" or "not confirmed" ONLY when the knowledge truly
+has nothing on the subject. Never say you did not understand a clear
+question. If the knowledge has a partial answer, give the confirmed
+part.
 
 ==================================================
 STRICT GROUNDING
 ==================================================
 
-- Never invent prices.
-- Never invent names.
-- Never invent availability.
-- Never invent appointment times.
-- Never invent contact information.
-- Never invent URLs.
-- Never invent product specifications.
-- Never invent policies.
-- Never invent locations.
-- Never invent capabilities.
-- Never invent procedures.
+Every business-specific statement must come from the retrieved
+knowledge or the client configuration.
 
-If a required detail is not available,
-say that it is not confirmed.
-
-If useful partial information exists,
-provide the confirmed part instead of refusing completely.
-
-==================================================
-URL HANDLING
-==================================================
-
-When URLs exist in the knowledge context:
-
-- Copy them exactly.
-- Do not modify them.
-- Prefer a relevant direct URL over a general website URL.
-- Do not create a URL from memory.
-
-The configured official website is:
-
-{website_instruction}
-
-Use it when:
-- the user explicitly asks for the website
-- the answer is incomplete and the business configuration
-  says the website is the appropriate fallback
-- the context does not contain a better relevant URL
+- Never invent prices, names, availability, appointment times,
+  contact information, URLs, specifications, policies, locations,
+  capabilities, or procedures.
+- Copy URLs exactly as they appear in the knowledge. Never build a
+  URL from memory. The only other allowed URL is the configured
+  official website.
+- If entries conflict, do not average or merge them; state the
+  uncertainty briefly.
+- Duplicate entries are one fact, not several.
+- If the user asks for a list (doctors, services, options), include
+  all the distinct relevant entries from the knowledge, not only
+  the first.
+- Prefer specific entries over generic ones.
 
 ==================================================
-LANGUAGE
+CONTEXT AND DIALECT
 ==================================================
 
+- Always read the latest message in the context of the conversation.
 - Answer in the same language as the user.
-- Preserve natural dialect when appropriate.
-- Arabic users should receive natural Arabic.
-- English users should receive natural English.
+- Match the user's dialect and tone (Saudi, Hijazi, Gulf, Egyptian,
+  etc.). If the user writes casually, answer casually. Keep it
+  natural and polite, not stiff.
 - Do not mention spelling mistakes.
 
 ==================================================
@@ -756,37 +695,26 @@ SAFETY
 
 Apply ALL safety rules configured for this client.
 
-Never bypass a configured safety rule simply because
-the user explicitly asks for the restricted information.
-
-If the user requests professional advice that the client's
-safety rules prohibit:
-
-- do not provide the prohibited advice
-- explain briefly
-- direct the user toward an appropriate configured service
-  or professional workflow when the knowledge/config provides one
-
-Do not invent a replacement service.
+Never bypass a configured safety rule simply because the user asks
+for the restricted information. If the user requests professional
+advice that the safety rules prohibit: do not provide it, explain
+briefly, and direct the user to the appropriate service or workflow
+that the knowledge/config provides. Do not invent a replacement
+service.
 
 ==================================================
 RESPONSE QUALITY
 ==================================================
 
-- Answer the actual question directly.
-- Do not repeat the user's question unnecessarily.
-- Keep the response concise but complete.
-- Use bullets when presenting multiple entities or options.
-- Include relevant prices when confirmed.
-- Include relevant URLs when confirmed.
-- Do not use Markdown bold or asterisks.
-- Do not dump unrelated context.
-- Do not mention the knowledge base.
-- Do not mention RAG.
-- Do not mention embeddings.
-- Do not mention retrieval.
-- Do not mention Claude or the AI system.
-- Do not reveal internal reasoning.
+- Answer the actual question directly and concisely.
+- Do not repeat the user's question.
+- Use bullets only for multiple items or options.
+- Include relevant prices and URLs when they are in the knowledge.
+- Plain text only: no Markdown bold, no asterisks.
+- Do not dump unrelated information.
+- Do not mention the knowledge base, RAG, embeddings, retrieval,
+  Claude, or the AI system. Do not reveal internal reasoning.
+- Return ONLY the final user-facing answer.
 {history_block}
 ==================================================
 RETRIEVED KNOWLEDGE
@@ -800,6 +728,17 @@ USER QUESTION
 
 {question}
 """
+
+    result = _call_claude(prompt, max_tokens=700)
+
+    if result:
+        return result
+
+    return generate_fallback_answer(
+        question=question,
+        gap_type="RELATED_BUT_UNKNOWN",
+        client_config=config,
+    )
 
     result = _call_claude(prompt, max_tokens=700)
 
@@ -1125,6 +1064,90 @@ def generate_fallback_answer(
     gap_type: str = "RELATED_BUT_UNKNOWN",
     client_config: dict | None = None,
 ) -> str:
+    """Deterministic fallback. No LLM, so it cannot hallucinate."""
+
+    config = _normalize_client_config(client_config)
+    client_name = _get_client_name(config)
+    website_url = _get_website_url(config)
+    description = _get_company_description(config)
+    arabic = _is_arabic(question)
+
+    if gap_type == "MEDICAL_ADVICE":
+
+        if arabic:
+            response = (
+                "عذرًا، ما أقدر أقدّم نصيحة طبية شخصية أو تشخيصًا 🌷\n"
+                "للحصول على المساعدة المناسبة، يُفضّل التواصل "
+                "مع مختص أو استخدام الخدمة المناسبة المتوفرة "
+                "لدى الجهة."
+            )
+
+            if website_url:
+                response += (
+                    f"\nيمكنك الرجوع إلى الموقع الرسمي:\n{website_url}"
+                )
+
+            return response
+
+        response = (
+            "Sorry, I can't provide personal medical advice "
+            "or a diagnosis 🌷\n"
+            "Please use the appropriate professional service "
+            "available from the business."
+        )
+
+        if website_url:
+            response += f"\nOfficial website:\n{website_url}"
+
+        return response
+
+    if gap_type == "OUT_OF_SCOPE":
+
+        if arabic:
+            response = (
+                f"أنا مساعد {client_name}، وأقدر أساعدك "
+                "في الأسئلة المتعلقة بخدمات الجهة ومعلوماتها."
+            )
+
+            if description:
+                response += f"\n\n{description}"
+
+            if website_url:
+                response += f"\n\nللمزيد من المعلومات:\n{website_url}"
+
+            return response
+
+        response = (
+            f"I'm the {client_name} and I can help with "
+            "questions related to the business and its services."
+        )
+
+        if description:
+            response += f"\n\n{description}"
+
+        if website_url:
+            response += f"\n\nFor more information:\n{website_url}"
+
+        return response
+
+    # RELATED_BUT_UNKNOWN: ask for clarification and point to the website.
+    if arabic:
+        response = "ممكن توضّح سؤالك أكثر عشان أساعدك؟ 🌷"
+
+        if website_url:
+            response += (
+                "\nوتقدر تتصفح الموقع الرسمي:\n"
+                f"{website_url}"
+            )
+
+        return response
+
+    response = "Could you clarify your question a bit so I can help? 🌷"
+
+    if website_url:
+        response += f"\nYou can also check the official website:\n{website_url}"
+
+    return response
     """Deterministic fallback. No LLM, so it cannot hallucinate."""
 
     config = _normalize_client_config(client_config)

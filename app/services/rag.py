@@ -328,7 +328,7 @@ def answer_question(
     # 3) Strong retrieval match: skip the relevance gate and let
     #    generate_answer decide (answer / use history / ask for the
     #    missing detail). Weak match: keep the gate.
-    strong_match = best_distance is not None and best_distance <= STRONG_MATCH_DISTANCE
+    strong_match = bool(knowledge_context)
 
     grounded_result = _generate_grounded_answer(
         question=cleaned_question,
