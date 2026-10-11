@@ -270,6 +270,19 @@ def chat(
     booking_flow_enabled = (
         flow_config.get("enabled") is True
     )
+    
+    logger.warning(
+    "[BOOKING DEBUG] client_id=%s flow_enabled=%s "
+    "details_detected=%s booking_request=%s message_length=%s",
+    client.id,
+    booking_flow_enabled,
+    has_lab_booking_details(message),
+    (
+        is_booking_number_request(message)
+        or is_lab_booking_request(message, context)
+    ),
+    len(message),
+)
 
     logger.info(
         "Chat request received for client_id=%s",
