@@ -135,98 +135,48 @@ def is_lab_booking_request(
 
 
 def has_lab_booking_details(message: str) -> bool:
-    """
-    Basic validation that the customer's message contains:
-    a name, a plausible age, and a test name.
-
-    This is a lightweight heuristic, not a full entity extractor.
-    """
+    """Check for patient name, age, and test in one or multiple lines."""
     text = normalize_text(message)
 
-    # Find an age between 1 and 120.
-    age_match = re.search(r"(?<!\d)(\d{1,3})(?!\d)", text)
+    if not text:
+        return False
 
+    # Find age, accepting Arabic or English digits.
+    age_match = re.search(r"(?<!\d)(\d{1,3})(?!\d)", text)
     if not age_match:
         return False
 
     age = int(age_match.group(1))
-
     if not 1 <= age <= 120:
         return False
 
-    # Check that a test or analysis is mentioned.
+    # Require a lab test or analysis.
     test_markers = (
-        "تحليل",
-        "تحاليل",
-        "فحص",
-        "فحوصات",
-        "test",
-        "tests",
-        "analysis",
-        "blood test",
+        "تحليل", "تحاليل", "فحص", "فحوصات",
+        "اشعه", "test", "tests", "analysis",
     )
-
-    has_test = any(marker in text for marker in test_markers)
-
-    if not has_test:
+    if not any(marker in text for marker in test_markers):
         return False
 
-    # Remove common labels and test words before checking
-    # whether any likely name tokens remain.
     ignored_words = {
-        "اسم",
-        "صاحب",
-        "التحليل",
-        "العمر",
-        "عمري",
-        "سنه",
-        "سنوات",
-        "سنة",
-        "عام",
-        "اعوام",
-        "رقم",
-        "الحجز",
-        "حجز",
-        "من",
-        "فضلا",
-        "الرجاء",
-        "تحليل",
-        "تحاليل",
-        "فحص",
-        "فحوصات",
-        "السكر",
-        "سكر",
-        "الضغط",
-        "ضغط",
-        "الدهون",
-        "الدم",
-        "الحمل",
-        "دلتا",
-        "مختبر",
-        "مختبرات",
-        "test",
-        "tests",
-        "analysis",
-        "blood",
-        "sugar",
-        "pressure",
+        "اسم", "صاحب", "التحليل", "العمر", "عمري",
+        "سنه", "سنوات", "عام", "اعوام", "رقم",
+        "الحجز", "حجز", "من", "فضلا", "الرجاء",
+        "تحليل", "تحاليل", "فحص", "فحوصات",
+        "السكر", "سكر", "الضغط", "ضغط", "الدهون",
+        "الدم", "الحمل", "دلتا", "مختبر", "مختبرات",
+        "اشعه", "test", "tests", "analysis",
+        "blood", "sugar", "pressure", "patient",
+        "name", "age",
     }
 
-    words = re.findall(
-        r"[\u0600-\u06FFA-Za-z]+",
-        text,
-    )
-
-    meaningful_words = [
+    words = re.findall(r"[\u0600-\u06FFA-Za-z]+", text)
+    name_tokens = [
         word for word in words
         if word not in ignored_words
-        and not word.isdigit()
     ]
 
-    has_name = bool(meaningful_words)
-
-    return has_name
-
+    return bool(name_tokens)
 
 # --------------------------------------------------
 # Intent classifier
