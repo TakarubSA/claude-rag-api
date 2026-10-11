@@ -50,16 +50,23 @@ def _clean_text(text: str) -> str:
 
 
 def _clean_answer_format(answer: str) -> str:
-    """Remove Markdown bold markers from customer-facing answers."""
+    """Clean formatting and hide internal RAG terminology."""
     answer = (answer or "").strip()
 
-    # Remove paired bold markers while preserving their inner text.
     answer = re.sub(r"\*\*(.*?)\*\*", r"\1", answer, flags=re.DOTALL)
     answer = answer.replace("**", "")
 
-    # Also remove Markdown bold markers written with underscores.
     answer = re.sub(r"__(.*?)__", r"\1", answer, flags=re.DOTALL)
     answer = answer.replace("__", "")
+
+    internal_terms = (
+        ("المعلومات المسترجعة", "المعلومات المتاحة"),
+        ("البيانات المسترجعة", "المعلومات المتاحة"),
+        ("السياق", "المعلومات المتاحة"),
+    )
+
+    for internal_term, customer_friendly_term in internal_terms:
+        answer = answer.replace(internal_term, customer_friendly_term)
 
     return answer.strip()
 
