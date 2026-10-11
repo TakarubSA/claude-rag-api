@@ -432,8 +432,11 @@ def answer_question(
         )
         return grounded_result
 
+    # Use the standalone rewritten query for gap classification so follow-ups
+    # such as "كم سعره؟" retain the subject resolved by Claude.
+    gap_question = search_query if search_query != CASUAL_MARKER else cleaned_question
     gap_type = classify_knowledge_gap(
-        question=cleaned_question,
+        question=gap_question,
         context=knowledge_context,
         client_config=client_config,
     )
@@ -441,7 +444,7 @@ def answer_question(
     print("KNOWLEDGE GAP:", gap_type)
 
     fallback = generate_fallback_answer(
-        question=cleaned_question,
+        question=gap_question,
         gap_type=gap_type,
         client_config=client_config,
     )
