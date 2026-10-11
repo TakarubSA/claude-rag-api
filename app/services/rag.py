@@ -50,21 +50,23 @@ def _clean_text(text: str) -> str:
 
 
 def _clean_answer_format(answer: str) -> str:
-    """Clean formatting and hide internal RAG terminology."""
+    """Clean formatting and hide internal RAG terminology from customer-facing answers."""
     answer = (answer or "").strip()
 
+    # Remove paired bold markers while preserving their inner text.
     answer = re.sub(r"\*\*(.*?)\*\*", r"\1", answer, flags=re.DOTALL)
     answer = answer.replace("**", "")
 
+    # Also remove Markdown bold markers written with underscores.
     answer = re.sub(r"__(.*?)__", r"\1", answer, flags=re.DOTALL)
     answer = answer.replace("__", "")
 
+    # Replace internal technical terms if the model accidentally exposes them.
     internal_terms = (
         ("المعلومات المسترجعة", "المعلومات المتاحة"),
         ("البيانات المسترجعة", "المعلومات المتاحة"),
         ("السياق", "المعلومات المتاحة"),
     )
-
     for internal_term, customer_friendly_term in internal_terms:
         answer = answer.replace(internal_term, customer_friendly_term)
 
@@ -82,23 +84,45 @@ def _clean_content(content: str) -> str:
     return content.strip()
 
 
+def _is_referential_follow_up(question: str) -> bool:
+    """Use history only when the latest message depends on an earlier subject."""
+    q = _clean_text(question).lower()
+    words = q.split()
+
+    # Short questions with pronouns/references need the previous subject.
+    reference_terms = (
+        "سعره", "سعرها", "بكم", "كم سعر", "احجزه", "احجزها",
+        "احجز", "حجزها", "حجزه", "كيف اقدر", "كيف أقدر",
+        "كيف احصل", "كيف أحصل", "وينه", "وينها", "هل هو",
+        "هل هي", "هذا", "هذه", "عليه", "عليها", "له", "لها",
+        "it", "that", "its", "how much", "where is it",
+    )
+    if len(words) <= 6 and any(term in q for term in reference_terms):
+        return True
+
+    # Very short fragments are commonly follow-ups; substantive questions
+    # should start a new topic and must not be anchored to old history.
+    return len(words) <= 3 and bool(re.search(
+        r"\\b(طيب|تمام|اوكي|يعني|ليش|متى|وين|كم)\\b", q
+    ))
+
+
 def _build_contextual_question(
     question: str,
     conversation_context: str | None,
 ) -> str:
-    """Explain how the latest message should be interpreted using history."""
+    """Attach history only for a clear short follow-up, not every new topic."""
     history = (conversation_context or "").strip()
 
-    if not history:
+    if not history or not _is_referential_follow_up(question):
         return question
 
     history = history[-MAX_HISTORY_CHARS:]
 
     return f"""
-Use the recent conversation to understand the user's latest message.
-
-The conversation history is provided to resolve references, omitted
-subjects, follow-up questions, and the meaning of short replies.
+Use the recent conversation ONLY to resolve the missing subject in the latest short follow-up.
+The latest user message has priority. Do not keep answering the previous topic if the latest
+message introduces a different subject or asks a complete standalone question.
 
 CONVERSATION HISTORY:
 {history}
@@ -108,19 +132,14 @@ LATEST USER MESSAGE:
 
 INSTRUCTIONS:
 - Answer the latest user message only.
-- Use the conversation history to resolve what words such as
-  "he", "it", "that service", "how much", and "is it a specialist"
-  refer to.
-- Do not repeat the previous answer unless it is necessary.
-- Treat prior assistant messages as conversation history, not as
-  independently verified business facts.
-- Use the retrieved knowledge and client configuration to verify
-  business facts.
-- Do not invent prices, qualifications, policies, or other details.
-- If the available knowledge does not answer the latest question,
-  say so clearly and direct the user to the appropriate support channel.
-- Write in the user's language.
-- Return plain text. Do not use Markdown bold markers or double asterisks.
+- Use history only to resolve references such as "سعره", "سعرها", "كيف أحجزها", or "وينه".
+- Do not assume the user is still discussing the old topic when the latest message is a new, complete question.
+- Treat prior assistant messages as conversation history, not independently verified business facts.
+- Verify business facts against the retrieved knowledge and client configuration.
+- Do not invent prices, qualifications, policies, or details.
+- Never mention internal technical terms such as "السياق" or "المعلومات المسترجعة".
+- If the information is unavailable, say so simply and naturally.
+- Write in the user's language as plain text, without Markdown bold markers.
 """.strip()
 
 
