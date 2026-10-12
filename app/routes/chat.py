@@ -185,6 +185,7 @@ def format_conversation_context(value: Any) -> str:
         line = _format_single_message(value)
         if line:
             return line[-MAX_CONTEXT_CHARS:]
+
         extracted = _extract_content(value)
         return extracted[-MAX_CONTEXT_CHARS:] if extracted else ""
 
@@ -219,9 +220,11 @@ def get_conversation_context(request: ChatRequest) -> tuple[str, str]:
     for field_name in candidates:
         if _is_identifier_field(field_name) or _is_control_field(field_name):
             continue
+
         value = payload.get(field_name)
         if value is None:
             continue
+
         context = format_conversation_context(value)
         if context:
             return context, field_name
@@ -274,23 +277,64 @@ def make_response(
     }
 
 
+# Deterministic detection: these requests should always use the handoff action.
+LAB_READING_PHRASES = (
+    "قراءة التحاليل",
+    "قراءة التحليل",
+    "تفسير التحاليل",
+    "تفسير التحليل",
+    "نتيجة تحليل",
+    "نتائج التحاليل",
+    "اقرا تحاليلي",
+    "اقرأ تحاليلي",
+    "ابغى احد يقرا",
+    "أبغى أحد يقرأ",
+    "ابا احد يقرا",
+    "أبا أحد يقرا",
+    "أحد يقراها",
+    "احد يقراها",
+    "اقرا النتيجة",
+    "اقرأ النتيجة",
+    "فسر التحليل",
+    "فسّر التحليل",
+    "فسرلي التحليل",
+    "فسر لي التحليل",
+    "interpret my lab",
+    "read my lab result",
+    "read my test result",
+)
+
+
+def is_lab_reading_request(message: str) -> bool:
+    normalized = " ".join((message or "").lower().split())
+    return any(phrase in normalized for phrase in LAB_READING_PHRASES)
+
+
 @router.post("/chat")
 def chat(
     request: ChatRequest,
     authorization: str | None = Header(default=None),
 ):
     if authorization is None:
-        raise HTTPException(status_code=401, detail="Authorization header is required")
+        raise HTTPException(
+            status_code=401,
+            detail="Authorization header is required",
+        )
 
     if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization format")
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid authorization format",
+        )
 
     token = authorization[len("Bearer "):].strip()
     client = get_client_by_token(token)
+
     if client is None:
         raise HTTPException(status_code=401, detail="Invalid token")
 
     message = request.message.strip()
+
     if not message:
         return make_response(
             action="reply",
@@ -299,22 +343,22 @@ def chat(
         )
 
     conversation_id = (request.conversation_id or "").strip()
+
     if len(conversation_id) > 200:
         raise HTTPException(
             status_code=400,
             detail="conversation_id must be 200 characters or fewer",
         )
 
-    # ChatGate should set reset_conversation=true when a conversation must start fresh.
     if request.reset_conversation and conversation_id:
         clear_conversation(client.id, conversation_id)
 
     incoming_context, context_source = get_conversation_context(request)
     stored_context = get_history(client.id, conversation_id) if conversation_id else ""
-    # Explicit history is preferred; otherwise use the server's temporary RAM history.
     conversation_context = incoming_context or stored_context
 
     diagnostics = get_request_diagnostics(request)
+
     logger.info(
         "Chat request: client_id=%s conversation_id_present=%s context_received=%s "
         "context_chars=%s context_source=%s memory_context=%s",
@@ -322,28 +366,53 @@ def chat(
         bool(conversation_id),
         bool(conversation_context),
         len(conversation_context),
-        context_source if incoming_context else ("server_memory" if stored_context else "none"),
+        context_source if incoming_context else (
+            "server_memory" if stored_context else "none"
+        ),
         bool(stored_context),
     )
     logger.info("Incoming request field names: %s", diagnostics["payload_fields"])
     logger.info("Incoming extra field names: %s", diagnostics["extra_fields"])
-    logger.info("Possible conversation history fields: %s", diagnostics["possible_context_fields"])
-    logger.info("Possible conversation identifier fields: %s", diagnostics["possible_conversation_id_fields"])
+    logger.info(
+        "Possible conversation history fields: %s",
+        diagnostics["possible_context_fields"],
+    )
+    logger.info(
+        "Possible conversation identifier fields: %s",
+        diagnostics["possible_conversation_id_fields"],
+    )
 
     if not conversation_id:
-        logger.warning("No conversation_id provided; temporary memory is disabled for this request.")
+        logger.warning(
+            "No conversation_id provided; temporary memory is disabled for this request."
+        )
 
-    intent = classify_intent(
-        message=message,
-        conversation_context=conversation_context,
-    )
+    # Force handoff for lab-reading requests before calling the AI intent classifier.
+    if is_lab_reading_request(message):
+        intent = "handoff"
+        logger.info(
+            "Forced lab-reading handoff: client_id=%s conversation_id_present=%s",
+            client.id,
+            bool(conversation_id),
+        )
+    else:
+        intent = classify_intent(
+            message=message,
+            conversation_context=conversation_context,
+        )
+
     logger.info("Intent classified: client_id=%s intent=%s", client.id, intent)
 
     if intent == "handoff":
         handoff_answer = (
-            "شكرًا لك، استلمنا المعلومات المطلوبة. "
-            "سيتم تحويل محادثتك إلى فريق خدمة العملاء "
-            "لمتابعة طلبك. يرجى الانتظار."
+            "أبشر، يسعدنا مساعدتك في قراءة التحاليل. "
+            "بحوّلك الآن إلى فريق خدمة العملاء لمساعدتك واستكمال الإجراء 🌷"
+            if is_lab_reading_request(message)
+            else (
+                "شكرًا لك، استلمنا المعلومات المطلوبة. "
+                "سيتم تحويل محادثتك إلى فريق خدمة العملاء "
+                "لمتابعة طلبك. يرجى الانتظار."
+            )
         )
         save_turn(client.id, conversation_id, message, handoff_answer)
         return make_response(action="handoff", answer=handoff_answer)
@@ -363,6 +432,7 @@ def chat(
         )
 
     answer = result.get("answer", "")
+
     if answer:
         save_turn(client.id, conversation_id, message, answer)
 
