@@ -1,11 +1,16 @@
+import logging
 import os
 import re
 
 import anthropic
 from dotenv import load_dotenv
 
+from app.services.history import trim_history
+
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 
 client = anthropic.Anthropic(
@@ -96,7 +101,6 @@ def _format_rules(
     return empty_message
 
 
-
 def _build_client_profile(client_config: dict) -> str:
     name = _get_client_name(client_config)
 
@@ -156,27 +160,33 @@ Response rules:
 """.strip()
 
 
-
 # ----------------------------------------------------------------------
 # Claude helpers
 # ----------------------------------------------------------------------
 
-def _extract_text(response):
-    for block in response.content:
-        if (
-            getattr(block, "type", None) == "text"
-            and getattr(block, "text", None)
-        ):
-            return block.text.strip()
+def _extract_text(response) -> str | None:
+    parts = [
+        block.text
+        for block in response.content
+        if getattr(block, "type", None) == "text"
+        and getattr(block, "text", None)
+    ]
 
-    return None
+    text = "".join(parts).strip()
+    return text or None
 
 
 def _call_claude(
     prompt: str,
     max_tokens: int,
-):
-    """Central Claude API wrapper. Never raises into the RAG pipeline."""
+) -> str | None:
+    """
+    Central Claude API wrapper. Never raises into the RAG pipeline.
+
+    The SDK already retries 429 / 5xx / connection errors, so the only
+    retry here is a second attempt with a bigger budget when the reply
+    was cut off by max_tokens before producing any text.
+    """
 
     for attempt in range(2):
         budget = (
@@ -197,8 +207,26 @@ def _call_claude(
                 ],
             )
 
-        except Exception as e:
-            print(f"[claude_service] API error: {e}")
+        except (
+            anthropic.AuthenticationError,
+            anthropic.PermissionDeniedError,
+            anthropic.NotFoundError,
+        ) as e:
+            # Configuration problem (bad key, unknown model): loud, not silent.
+            logger.error("Claude configuration error: %s", e)
+            return None
+
+        except anthropic.APIStatusError as e:
+            logger.warning(
+                "Claude API error %s (request_id=%s): %s",
+                e.status_code,
+                getattr(e, "request_id", None),
+                e.message,
+            )
+            return None
+
+        except anthropic.APIConnectionError as e:
+            logger.warning("Claude connection error: %s", e)
             return None
 
         text = _extract_text(response)
@@ -206,13 +234,36 @@ def _call_claude(
         if text:
             return text
 
-        print(
-            "[claude_service] no text block "
-            f"(stop_reason={getattr(response, 'stop_reason', None)}), "
-            "retrying"
-        )
+        stop_reason = getattr(response, "stop_reason", None)
+
+        if stop_reason != "max_tokens":
+            logger.warning(
+                "Claude returned no text (stop_reason=%s)", stop_reason
+            )
+            return None
+
+        logger.info("Claude hit max_tokens before any text, retrying")
 
     return None
+
+
+def _parse_label(
+    result: str | None,
+    allowed: set[str],
+    default: str,
+) -> str:
+    """
+    Read a single-word label from a classifier reply.
+    Tolerates casing, quotes, trailing punctuation and extra lines.
+    """
+
+    if not result:
+        return default
+
+    first_line = result.strip().splitlines()[0]
+    label = re.sub(r"[^A-Z_]", "", first_line.upper())
+
+    return label if label in allowed else default
 
 
 # ----------------------------------------------------------------------
@@ -231,8 +282,16 @@ def _light_clean(text: str) -> str:
     return text
 
 
-def _history_block(history: str, title: str, note: str) -> str:
-    history = (history or "").strip()[-4000:]
+HISTORY_CHAR_LIMIT = 4000
+
+
+def _history_block(
+    history: str,
+    title: str,
+    note: str,
+    limit: int = HISTORY_CHAR_LIMIT,
+) -> str:
+    history = trim_history(history, limit)
 
     if not history:
         return ""
@@ -477,12 +536,12 @@ USER MESSAGE
     if not result:
         return cleaned or question
 
-    result = result.strip()
+    result = result.strip().splitlines()[0].strip()
 
     if result.upper().startswith("CASUAL_CONVERSATION"):
         return CASUAL_MARKER
 
-    if result.startswith("SEARCH_QUERY:"):
+    if result.upper().startswith("SEARCH_QUERY:"):
         result = result[len("SEARCH_QUERY:"):].strip()
 
     return result or cleaned or question
@@ -495,10 +554,22 @@ USER MESSAGE
 def generate_casual_answer(
     question: str,
     client_config: dict | None = None,
+    history: str = "",
 ):
     config = _normalize_client_config(client_config)
     client_name = _get_client_name(config)
     description = _get_company_description(config)
+
+    # A short tail is enough to keep the reply natural mid-conversation.
+    history_block = _history_block(
+        history,
+        "RECENT CONVERSATION",
+        "Use this only to keep the reply natural: if the conversation is "
+        "already under way, do not greet or welcome the user again as if "
+        "they just arrived, and match their dialect. Do not repeat or add "
+        "business facts from it.",
+        limit=1500,
+    )
 
     prompt = f"""
 You are a friendly customer-support assistant.
@@ -562,6 +633,7 @@ hi
 Response:
 Hello 🌷 How can I help you today?
 
+{history_block}
 ==================================================
 USER
 ==================================================
@@ -574,7 +646,10 @@ USER
     if result:
         return result
 
-    return "حياك الله 🌷 كيف أقدر أساعدك؟"
+    if _is_arabic(question):
+        return "حياك الله 🌷 كيف أقدر أساعدك؟"
+
+    return "Hello 🌷 How can I help you today?"
 
 
 # ----------------------------------------------------------------------
@@ -742,17 +817,6 @@ USER QUESTION
 
 {question}
 """
-
-    result = _call_claude(prompt, max_tokens=700)
-
-    if result:
-        return result
-
-    return generate_fallback_answer(
-        question=question,
-        gap_type="RELATED_BUT_UNKNOWN",
-        client_config=config,
-    )
 
     result = _call_claude(prompt, max_tokens=700)
 
@@ -949,17 +1013,11 @@ NOT_ANSWERABLE
 
     result = _call_claude(prompt, max_tokens=100)
 
-    if result:
-        result = result.strip().upper()
-        first_line = result.splitlines()[0].strip()
-
-        if first_line == "ANSWERABLE":
-            return "ANSWERABLE"
-
-        if first_line == "NOT_ANSWERABLE":
-            return "NOT_ANSWERABLE"
-
-    return "NOT_ANSWERABLE"
+    return _parse_label(
+        result,
+        allowed={"ANSWERABLE", "NOT_ANSWERABLE"},
+        default="NOT_ANSWERABLE",
+    )
 
 
 # ----------------------------------------------------------------------
@@ -1056,17 +1114,15 @@ USER QUESTION
 
     result = _call_claude(prompt, max_tokens=40)
 
-    if result:
-        result = result.strip().upper()
-
-        if result in {
+    return _parse_label(
+        result,
+        allowed={
             "RELATED_BUT_UNKNOWN",
             "MEDICAL_ADVICE",
             "OUT_OF_SCOPE",
-        }:
-            return result
-
-    return "RELATED_BUT_UNKNOWN"
+        },
+        default="RELATED_BUT_UNKNOWN",
+    )
 
 
 # ----------------------------------------------------------------------
@@ -1160,91 +1216,5 @@ def generate_fallback_answer(
 
     if website_url:
         response += f"\nYou can also check the official website:\n{website_url}"
-
-    return response
-    """Deterministic fallback. No LLM, so it cannot hallucinate."""
-
-    config = _normalize_client_config(client_config)
-    client_name = _get_client_name(config)
-    website_url = _get_website_url(config)
-    description = _get_company_description(config)
-    arabic = _is_arabic(question)
-
-    if gap_type == "MEDICAL_ADVICE":
-
-        if arabic:
-            response = (
-                "عذرًا، ما أقدر أقدّم نصيحة طبية شخصية أو تشخيصًا 🌷\n"
-                "للحصول على المساعدة المناسبة، يُفضّل التواصل "
-                "مع مختص أو استخدام الخدمة المناسبة المتوفرة "
-                "لدى الجهة."
-            )
-
-            if website_url:
-                response += (
-                    f"\nيمكنك الرجوع إلى الموقع الرسمي:\n{website_url}"
-                )
-
-            return response
-
-        response = (
-            "Sorry, I can't provide personal medical advice "
-            "or a diagnosis 🌷\n"
-            "Please use the appropriate professional service "
-            "available from the business."
-        )
-
-        if website_url:
-            response += f"\nOfficial website:\n{website_url}"
-
-        return response
-
-    if gap_type == "OUT_OF_SCOPE":
-
-        if arabic:
-            response = (
-                f"أنا مساعد {client_name}، وأقدر أساعدك "
-                "في الأسئلة المتعلقة بخدمات الجهة ومعلوماتها."
-            )
-
-            if description:
-                response += f"\n\n{description}"
-
-            if website_url:
-                response += f"\n\nللمزيد من المعلومات:\n{website_url}"
-
-            return response
-
-        response = (
-            f"I'm the {client_name} and I can help with "
-            "questions related to the business and its services."
-        )
-
-        if description:
-            response += f"\n\n{description}"
-
-        if website_url:
-            response += f"\n\nFor more information:\n{website_url}"
-
-        return response
-
-    if arabic:
-        response = "ما لقيت معلومة مؤكدة عن هذا السؤال حاليًا 🌷"
-
-        if website_url:
-            response += (
-                "\nتقدر تتأكد من الموقع الرسمي للحصول "
-                f"على أدق المعلومات:\n{website_url}"
-            )
-
-        return response
-
-    response = "I couldn't find confirmed information about this right now 🌷"
-
-    if website_url:
-        response += (
-            "\nPlease check the official website for "
-            f"the most accurate information:\n{website_url}"
-        )
 
     return response

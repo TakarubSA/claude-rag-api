@@ -1,10 +1,14 @@
+import logging
 import os
 import re
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from app.embeddings.voyage import create_embeddings
 from app.knowledge.repository import search_knowledge
+from app.services.history import trim_history
 from app.llm.claude import (
+    CASUAL_MARKER,
     rewrite_query,
     generate_answer,
     generate_casual_answer,
@@ -14,7 +18,11 @@ from app.llm.claude import (
 )
 
 
-CASUAL_MARKER = "__CASUAL_CONVERSATION__"
+logger = logging.getLogger(__name__)
+
+# Shared pool for I/O that can overlap (Claude calls, DB searches).
+# Kept small so concurrent requests stay within the DB connection pool.
+executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix="rag")
 
 SEARCH_LIMIT = 20
 CONTEXT_LIMIT = 6
@@ -90,7 +98,6 @@ def _latest_assistant_message(history: str) -> str:
     return assistant_messages[-1] if assistant_messages else ""
 
 
-
 def _latest_user_message(history: str) -> str:
     """Return the most recent user turn from role-labelled conversation history."""
     if not history:
@@ -121,6 +128,7 @@ def _latest_user_message(history: str) -> str:
 
     flush()
     return user_messages[-1] if user_messages else ""
+
 
 def _clean_answer_format(answer: str) -> str:
     """Clean formatting and hide internal RAG terminology from customer-facing answers."""
@@ -157,50 +165,6 @@ def _clean_content(content: str) -> str:
     return content.strip()
 
 
-def _build_contextual_question(
-    question: str,
-    conversation_context: str | None,
-) -> str:
-    """Explain how the latest message should be interpreted using history."""
-    history = (conversation_context or "").strip()
-
-    if not history:
-        return question
-
-    history = history[-MAX_HISTORY_CHARS:]
-
-    return f"""
-Use the recent conversation to understand the user's latest message.
-
-The conversation history is provided to resolve references, omitted
-subjects, follow-up questions, and the meaning of short replies.
-
-CONVERSATION HISTORY:
-{history}
-
-LATEST USER MESSAGE:
-{question}
-
-INSTRUCTIONS:
-- Answer the latest user message only.
-- Use the conversation history to resolve what words such as
-  "he", "it", "that service", "how much", and "is it a specialist"
-  refer to.
-- Do not repeat the previous answer unless it is necessary.
-- Treat prior assistant messages as conversation history, not as
-  independently verified business facts.
-- Use the retrieved knowledge and client configuration to verify
-  business facts.
-- Do not invent prices, qualifications, policies, or other details.
-- Never mention internal technical terms such as "السياق" or "المعلومات المسترجعة".
-- Speak naturally as a customer-service agent. If information is unavailable, say so simply without explaining internal system mechanics.
-- If the available knowledge does not answer the latest question,
-  say so clearly and direct the user to the appropriate support channel.
-- Write in the user's language.
-- Return plain text. Do not use Markdown bold markers or double asterisks.
-""".strip()
-
-
 # --------------------------------------------------
 # Retrieval helpers
 # --------------------------------------------------
@@ -217,8 +181,10 @@ def _search_many(texts: list[str], client_id: int):
                 f"for {len(texts)} queries"
             )
 
-        return [
-            search_knowledge(
+        # Each search is an independent DB round trip: run them in parallel.
+        futures = [
+            executor.submit(
+                search_knowledge,
                 embedding,
                 client_id=client_id,
                 limit=SEARCH_LIMIT,
@@ -227,8 +193,10 @@ def _search_many(texts: list[str], client_id: int):
             for query_text, embedding in zip(texts, embeddings)
         ]
 
-    except Exception as exc:
-        print(f"SEARCH ERROR: {exc}")
+        return [future.result() for future in futures]
+
+    except Exception:
+        logger.exception("Knowledge search failed: client_id=%s", client_id)
         return None
 
 
@@ -271,7 +239,7 @@ def _rerank(query: str, results):
         api_key = os.getenv("VOYAGE_API_KEY")
 
         if not api_key:
-            print("RERANK SKIPPED: VOYAGE_API_KEY is not configured")
+            logger.warning("Rerank skipped: VOYAGE_API_KEY is not configured")
             return results
 
         voyage_client = voyageai.Client(api_key=api_key)
@@ -284,8 +252,8 @@ def _rerank(query: str, results):
 
         return [results[item.index] for item in reranked.results]
 
-    except Exception as exc:
-        print(f"RERANK ERROR: {exc}")
+    except Exception:
+        logger.exception("Rerank failed; using retrieval order")
         return results
 
 
@@ -335,7 +303,7 @@ def _generate_grounded_answer(
     )
 
     if not isinstance(answer, str) or not answer.strip():
-        print("GROUNDED ANSWER EMPTY: falling back to knowledge-gap handling")
+        logger.warning("Grounded answer empty; falling back to knowledge-gap handling")
         return None
 
     return {
@@ -350,23 +318,59 @@ def _generate_grounded_answer(
 # --------------------------------------------------
 
 
+def _history(conversation_context: str | None) -> str:
+    return trim_history(conversation_context, MAX_HISTORY_CHARS)
+
+
+def build_search_query(
+    question: str,
+    client_config: dict | None = None,
+    conversation_context: str | None = None,
+) -> str:
+    """
+    Turn the latest message into a standalone search query (or CASUAL_MARKER).
+
+    Public so the chat route can start it in parallel with intent
+    classification and hand the result to answer_question().
+    """
+    cleaned_question = _clean_text(question)
+
+    if not cleaned_question:
+        return cleaned_question
+
+    # Claude resolves references using history and creates a standalone search query.
+    search_query = rewrite_query(
+        cleaned_question,
+        client_config=client_config,
+        history=_history(conversation_context),
+    )
+
+    if not isinstance(search_query, str) or not search_query.strip():
+        return cleaned_question
+
+    return search_query.strip()
+
+
 def answer_question(
     question: str,
     client_id: int,
     client_config: dict | None = None,
     conversation_context: str | None = None,
+    search_query: str | None = None,
 ):
     """
     Multi-tenant RAG pipeline with conversation-aware retrieval.
 
     The latest user message is interpreted in context. Knowledge retrieval
     remains isolated by client_id.
+
+    search_query: optional result of build_search_query() computed ahead of
+    time; when omitted it is computed here.
     """
-    print("CLIENT CONFIG LOADED:", bool(client_config))
-    print(
-        "CONVERSATION CONTEXT RECEIVED:",
-        bool(conversation_context),
-        "CHARS:",
+    logger.info(
+        "RAG request: client_id=%s config_loaded=%s context_chars=%s",
+        client_id,
+        bool(client_config),
         len(conversation_context or ""),
     )
 
@@ -380,22 +384,18 @@ def answer_question(
         }
 
     # Keep the latest message and conversation history separate.
-    history = (conversation_context or "").strip()[-MAX_HISTORY_CHARS:]
+    history = _history(conversation_context)
 
-    # Claude resolves references using history and creates a standalone search query.
-    search_query = rewrite_query(
-        cleaned_question,
-        client_config=client_config,
-        history=history,
-    )
+    if not search_query:
+        search_query = build_search_query(
+            question,
+            client_config=client_config,
+            conversation_context=conversation_context,
+        )
 
-    if not isinstance(search_query, str) or not search_query.strip():
-        search_query = cleaned_question
-    else:
-        search_query = search_query.strip()
-
-    print("ORIGINAL QUERY:", cleaned_question)
-    print("SEARCH QUERY:", search_query)
+    # Customer text: DEBUG only, so it stays out of normal production logs.
+    logger.debug("Original query: %s", cleaned_question)
+    logger.debug("Search query: %s", search_query)
 
     # Keep retrieval context-aware even when the rewriter misses a reference.
     # Search terms are generated from the previous user turn + previous assistant
@@ -411,7 +411,7 @@ def answer_question(
     # do not discard the business context. Use the recent exchange for retrieval.
     if search_query == CASUAL_MARKER and _is_short_confirmation(cleaned_question):
         if previous_user or previous_assistant:
-            print("CONTEXTUAL REPLY FALLBACK: using recent exchange for retrieval")
+            logger.info("Contextual reply fallback: using recent exchange for retrieval")
             search_query = contextual_retrieval_query or previous_assistant or previous_user
 
     # Handle ordinary casual conversation only when it is not a contextual
@@ -420,6 +420,7 @@ def answer_question(
         casual_answer = generate_casual_answer(
             cleaned_question,
             client_config=client_config,
+            history=history,
         )
 
         if isinstance(casual_answer, str) and casual_answer.strip():
@@ -455,10 +456,7 @@ def answer_question(
     search_failed = result_lists is None
 
     if search_failed:
-        print(
-            "RETRIEVAL UNAVAILABLE: "
-            "continuing with client configuration."
-        )
+        logger.warning("Retrieval unavailable; continuing with client configuration")
         result_lists = []
 
     results = [
@@ -474,25 +472,23 @@ def answer_question(
         results = _rerank(search_query, results)
         results = results[:CONTEXT_LIMIT]
 
-    if results:
-        for result in results:
-            print("ID:", result.id)
-            print("DISTANCE:", result.distance)
-            print("KEYWORD HITS:", getattr(result, "keyword_hits", 0))
-            print(
-                "RANK SCORE:",
-                getattr(result, "rank_score", result.distance),
-            )
-            print("CONTENT:", result.content)
-            print("---")
-    else:
-        print("NO RETRIEVED KNOWLEDGE")
+    logger.info(
+        "Retrieved %s knowledge entries: ids=%s",
+        len(results),
+        [result.id for result in results],
+    )
+
+    for result in results:
+        logger.debug(
+            "Result id=%s distance=%s keyword_hits=%s rank_score=%s content=%s",
+            result.id,
+            result.distance,
+            getattr(result, "keyword_hits", 0),
+            getattr(result, "rank_score", result.distance),
+            result.content,
+        )
 
     knowledge_context = _build_context(results)
-
-    print("\n========== RETRIEVED CONTEXT ==========")
-    print(knowledge_context if knowledge_context else "[empty]")
-    print("========================================\n")
 
     best_distance = min(
         (float(result.distance) for result in results),
@@ -512,9 +508,6 @@ def answer_question(
         if search_failed or not results:
             grounded_result["status"] = "CONFIG_ONLY"
 
-        grounded_result["answer"] = _clean_answer_format(
-            grounded_result["answer"]
-        )
         return grounded_result
 
     gap_type = classify_knowledge_gap(
@@ -523,7 +516,7 @@ def answer_question(
         client_config=client_config,
     )
 
-    print("KNOWLEDGE GAP:", gap_type)
+    logger.info("Knowledge gap: client_id=%s type=%s", client_id, gap_type)
 
     fallback = generate_fallback_answer(
         question=cleaned_question,

@@ -5,6 +5,8 @@ import os
 import anthropic
 from dotenv import load_dotenv
 
+from app.services.history import trim_history
+
 load_dotenv()
 
 logger = logging.getLogger(__name__)
@@ -34,9 +36,7 @@ def classify_intent(
     - handoff: Transfer to a human agent when justified.
     """
     message = (message or "").strip()
-    conversation_context = (
-        conversation_context or ""
-    ).strip()[-8000:]
+    conversation_context = trim_history(conversation_context, 8000)
 
     if not message:
         return "reply"

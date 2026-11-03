@@ -7,8 +7,10 @@ from app.knowledge.ingestion import ingest_data
 router = APIRouter()
 
 
+# Plain `def` (not async): embedding and DB writes block, so FastAPI must run
+# this in its thread pool instead of freezing the event loop for every user.
 @router.post("/knowledge/upload")
-async def upload_knowledge(
+def upload_knowledge(
     document: dict = Body(...),
     authorization: str | None = Header(default=None),
 ):
@@ -24,7 +26,7 @@ async def upload_knowledge(
             detail="Invalid authorization format",
         )
 
-    token = authorization.replace("Bearer ", "", 1).strip()
+    token = authorization[len("Bearer "):].strip()
 
     client = get_client_by_token(token)
 

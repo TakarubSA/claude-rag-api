@@ -40,18 +40,39 @@ def _tokens(s: str) -> list[str]:
     return list(dict.fromkeys(out))
 
 
+INSERT_KNOWLEDGE_QUERY = text("""
+    INSERT INTO knowledge (content, embedding, client_id)
+    VALUES (:content, CAST(:embedding AS vector), :client_id)
+""")
+
+
 def insert_knowledge(content: str, embedding: list[float], client_id: int):
-    query = text("""
-        INSERT INTO knowledge (content, embedding, client_id)
-        VALUES (:content, CAST(:embedding AS vector), :client_id)
-    """)
+    insert_knowledge_many([content], [embedding], client_id)
+
+
+def insert_knowledge_many(
+    contents: list[str],
+    embeddings: list[list[float]],
+    client_id: int,
+):
+    """Insert all entries in one transaction: either every row is saved or none."""
+    if len(contents) != len(embeddings):
+        raise ValueError(
+            f"Got {len(contents)} entries but {len(embeddings)} embeddings"
+        )
+
+    if not contents:
+        return
 
     with engine.begin() as connection:
-        connection.execute(query, {
-            "content": content,
-            "embedding": str(embedding),
-            "client_id": client_id,
-        })
+        connection.execute(INSERT_KNOWLEDGE_QUERY, [
+            {
+                "content": content,
+                "embedding": str(embedding),
+                "client_id": client_id,
+            }
+            for content, embedding in zip(contents, embeddings)
+        ])
 
 
 def search_knowledge(
