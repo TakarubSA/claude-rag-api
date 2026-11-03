@@ -45,7 +45,7 @@ python -m pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-**Dependency note:** the current `requirements.txt` does not list all direct imports used by the application. At minimum, a clean install also needs SQLAlchemy, a PostgreSQL driver, Sentence Transformers, PyJWT, and `pwdlib`. Add and pin the dependencies required for your environment before relying on the install command above. The embedding model is downloaded by Sentence Transformers on first use, so the host needs access to the model files or a pre-cached copy.
+The embedding model is downloaded by Sentence Transformers on first use, so the host needs access to the model files or a pre-cached copy. `psycopg` needs the PostgreSQL client library (`libpq`) on the host.
 
 Once running, FastAPI's interactive API documentation is available at `/docs`.
 
@@ -117,11 +117,10 @@ reembed_knowledge.py  Local-database embedding migration utility
 
 ## Known limitations and weaknesses
 
-1. **The dependency list is incomplete.** A fresh environment can fail to import modules such as SQLAlchemy or Sentence Transformers because their packages are absent from `requirements.txt`. This makes setup unreliable and prevents reproducible deployments. Pin all direct dependencies and validate installation in a clean environment.
-2. **Conversation memory is per process.** It disappears on restart and is not shared between multiple Uvicorn workers or server instances. A follow-up can therefore lose its history depending on which process handles it. Use a shared store such as Redis or PostgreSQL if persistent or multi-instance conversations are needed.
-3. **The `api` action does not execute an operation.** The intent prompt describes live operations, but `/chat` sends every non-handoff request to the RAG answer path. The response may say `"action": "api"`, but no booking, order lookup, or other API tool is called. Until such handlers exist, remove or constrain this intent, or add explicit operation dispatch and error handling.
-4. **No schema migrations or bootstrap instructions are included.** The service assumes particular database tables and a compatible vector column already exist. A new developer or deployment must reconstruct that schema before the service can work. Add versioned migrations and a documented database bootstrap process.
-5. **Operational errors and content can end up in logs.** The RAG pipeline prints retrieved knowledge text and exception messages. If that content contains customer or business-sensitive information, logs can expose it and become noisy. Use structured logging, avoid printing retrieved content, and define appropriate log retention and access controls.
+1. **Conversation memory is per process.** It disappears on restart and is not shared between multiple Uvicorn workers or server instances. A follow-up can therefore lose its history depending on which process handles it. Use a shared store such as Redis or PostgreSQL if persistent or multi-instance conversations are needed.
+2. **The `api` action does not execute an operation.** The intent prompt describes live operations, but `/chat` sends every non-handoff request to the RAG answer path. The response may say `"action": "api"`, but no booking, order lookup, or other API tool is called. Until such handlers exist, remove or constrain this intent, or add explicit operation dispatch and error handling.
+3. **No schema migrations or bootstrap instructions are included.** The service assumes particular database tables and a compatible vector column already exist. A new developer or deployment must reconstruct that schema before the service can work. Add versioned migrations and a documented database bootstrap process.
+4. **Logging and data retention.** Customer questions and retrieved knowledge are logged only at DEBUG level; keep DEBUG off in production. Define log retention and access controls for the INFO/WARNING logs, which include client IDs and retrieved entry IDs.
 
 ## Maintenance utility
 

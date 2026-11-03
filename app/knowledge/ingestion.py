@@ -1,6 +1,6 @@
 from app.documents.loader import load_document, prepare_documents
 from app.embeddings.voyage import create_embeddings
-from app.knowledge.repository import insert_knowledge
+from app.knowledge.repository import insert_knowledge_many
 
 
 def ingest_document(file_path: str, client_id: int):
@@ -17,11 +17,10 @@ def ingest_data(document, client_id: int):
 
     embeddings = create_embeddings(prepared_documents)
 
-    for content, embedding in zip(prepared_documents, embeddings):
-        insert_knowledge(
-            content=content,
-            embedding=embedding,
-            client_id=client_id,
-        )
+    insert_knowledge_many(
+        contents=prepared_documents,
+        embeddings=embeddings,
+        client_id=client_id,
+    )
 
     return len(prepared_documents)

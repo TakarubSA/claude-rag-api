@@ -1,9 +1,12 @@
 import logging
+import time
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from app.embeddings.voyage import create_embeddings
 from app.routes.chat import router as chat_router
 from app.routes.knowledge import router as knowledge_router
 
@@ -11,7 +14,21 @@ from app.routes.knowledge import router as knowledge_router
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Load and run the embedding model once at boot (~4-5 s) so the first
+    # user request after a restart does not pay for it.
+    started = time.perf_counter()
+    create_embeddings(["warm up"], input_type="query")
+    logger.info(
+        "Embedding model ready in %.1f s",
+        time.perf_counter() - started,
+    )
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 @app.exception_handler(RequestValidationError)

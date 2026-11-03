@@ -6,13 +6,14 @@ from pydantic import BaseModel, ConfigDict
 
 from app.clients.repository import get_client_by_token
 from app.knowledge.gaps_repository import insert_gap
+from app.services.history import drop_current_message, trim_history
 from app.services.conversation_memory import (
     clear_conversation,
     get_history,
     save_turn,
 )
 from app.services.intent import classify_intent
-from app.services.rag import answer_question
+from app.services.rag import answer_question, build_search_query, executor
 
 
 router = APIRouter()
@@ -153,7 +154,7 @@ def format_conversation_context(value: Any) -> str:
         return ""
 
     if isinstance(value, str):
-        return value.strip()[-MAX_CONTEXT_CHARS:]
+        return trim_history(value, MAX_CONTEXT_CHARS)
 
     if isinstance(value, list):
         lines = []
@@ -165,7 +166,7 @@ def format_conversation_context(value: Any) -> str:
                 text = _extract_content(item)
                 if text:
                     lines.append(text)
-        return "\n".join(lines)[-MAX_CONTEXT_CHARS:]
+        return trim_history("\n".join(lines), MAX_CONTEXT_CHARS)
 
     if isinstance(value, dict):
         for key in (
@@ -184,12 +185,12 @@ def format_conversation_context(value: Any) -> str:
 
         line = _format_single_message(value)
         if line:
-            return line[-MAX_CONTEXT_CHARS:]
+            return trim_history(line, MAX_CONTEXT_CHARS)
 
         extracted = _extract_content(value)
-        return extracted[-MAX_CONTEXT_CHARS:] if extracted else ""
+        return trim_history(extracted, MAX_CONTEXT_CHARS)
 
-    return str(value).strip()[-MAX_CONTEXT_CHARS:]
+    return trim_history(str(value), MAX_CONTEXT_CHARS)
 
 
 def get_conversation_context(request: ChatRequest) -> tuple[str, str]:
@@ -355,7 +356,12 @@ def chat(
 
     incoming_context, context_source = get_conversation_context(request)
     stored_context = get_history(client.id, conversation_id) if conversation_id else ""
-    conversation_context = incoming_context or stored_context
+    # Some integrations send the transcript including the message being
+    # asked now; it must not be mistaken for the previous turn.
+    conversation_context = drop_current_message(
+        incoming_context or stored_context,
+        message,
+    )
 
     diagnostics = get_request_diagnostics(request)
 
@@ -387,6 +393,8 @@ def chat(
             "No conversation_id provided; temporary memory is disabled for this request."
         )
 
+    search_query_future = None
+
     # Force handoff for lab-reading requests before calling the AI intent classifier.
     if is_lab_reading_request(message):
         intent = "handoff"
@@ -396,6 +404,15 @@ def chat(
             bool(conversation_id),
         )
     else:
+        # The query rewrite does not depend on the intent, so both Claude
+        # calls run at the same time instead of one after the other.
+        # On a handoff the rewrite result is simply not used.
+        search_query_future = executor.submit(
+            build_search_query,
+            message,
+            client_config=client.ai_config,
+            conversation_context=conversation_context,
+        )
         intent = classify_intent(
             message=message,
             conversation_context=conversation_context,
@@ -417,19 +434,33 @@ def chat(
         save_turn(client.id, conversation_id, message, handoff_answer)
         return make_response(action="handoff", answer=handoff_answer)
 
+    search_query = None
+
+    if search_query_future is not None:
+        try:
+            search_query = search_query_future.result()
+        except Exception:
+            # answer_question() will rewrite the query itself.
+            logger.exception("Parallel query rewrite failed: client_id=%s", client.id)
+
     result = answer_question(
         question=message,
         client_id=client.id,
         client_config=client.ai_config,
         conversation_context=conversation_context,
+        search_query=search_query,
     )
 
     if result.get("status") == "RELATED_BUT_UNKNOWN":
-        insert_gap(
-            client_id=client.id,
-            message=message,
-            gap_type=result["status"],
-        )
+        # Gap tracking is analytics: never fail the user's answer over it.
+        try:
+            insert_gap(
+                client_id=client.id,
+                message=message,
+                gap_type=result["status"],
+            )
+        except Exception:
+            logger.exception("Failed to record knowledge gap: client_id=%s", client.id)
 
     answer = result.get("answer", "")
 

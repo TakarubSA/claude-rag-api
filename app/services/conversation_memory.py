@@ -9,6 +9,8 @@ import threading
 import time
 from typing import Any
 
+from app.services.history import trim_history
+
 TTL_SECONDS = 30 * 60
 CLEANUP_INTERVAL_SECONDS = 60
 MAX_MESSAGES_PER_CONVERSATION = 20
@@ -59,7 +61,7 @@ def get_history(client_id: int, conversation_id: str) -> str:
     history = "\n".join(
         f'{item["role"]}: {item["content"]}' for item in messages
     )
-    return history[-MAX_CONTEXT_CHARS:]
+    return trim_history(history, MAX_CONTEXT_CHARS)
 
 
 def save_turn(
