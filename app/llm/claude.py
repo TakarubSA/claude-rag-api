@@ -661,15 +661,33 @@ def generate_answer(
     context: str,
     client_config: dict | None = None,
     history: str = "",
+    resolved_question: str = "",
 ):
     """
     Generate the final answer from retrieved knowledge.
     History is used only to identify what the question refers to.
+
+    resolved_question: the standalone version of a follow-up produced by
+    rewrite_query (e.g. "كم سعره؟" -> "كم سعر باقة الفحص الشامل؟"), so the
+    answer step does not have to re-resolve the reference on its own.
     """
 
     config = _normalize_client_config(client_config)
     client_profile = _build_client_profile(config)
     website_url = _get_website_url(config)
+
+    resolved_block = ""
+
+    if (
+        resolved_question
+        and resolved_question != CASUAL_MARKER
+        and _light_clean(resolved_question) != _light_clean(question)
+    ):
+        resolved_block = f"""
+In the context of the conversation, this message means:
+{resolved_question}
+Answer that. Keep the language and dialect of the user's own message.
+"""
 
     website_instruction = (
         website_url
@@ -816,7 +834,7 @@ USER QUESTION
 ==================================================
 
 {question}
-"""
+{resolved_block}"""
 
     result = _call_claude(prompt, max_tokens=700)
 
