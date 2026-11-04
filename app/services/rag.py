@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 # Kept small so concurrent requests stay within the DB connection pool.
 executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix="rag")
 
-SEARCH_LIMIT = 20
+SEARCH_LIMIT = 60  # many entries are rephrasings of one answer; see _unique_answers
 CONTEXT_LIMIT = 6
 MAX_DISTANCE = 0.65
 MAX_HISTORY_CHARS = 6000
@@ -257,6 +257,39 @@ def _rerank(query: str, results):
         return results
 
 
+def _answer_key(content: str) -> str:
+    """The fact an entry states: its answer for Q&A entries, else the content."""
+    content = _clean_content(content)
+
+    if "Answer:" in content:
+        content = content.split("Answer:", 1)[1]
+
+    return re.sub(r"\s+", " ", content).strip().casefold()
+
+
+def _unique_answers(results):
+    """
+    Keep the best-ranked entry per distinct answer.
+
+    The knowledge holds many rephrasings of one question with the same
+    answer; without this they fill every context slot with a single fact
+    and push other relevant facts (e.g. a fee) out of the context.
+    """
+    seen: set[str] = set()
+    unique = []
+
+    for result in results:
+        key = _answer_key(result.content)
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+        unique.append(result)
+
+    return unique
+
+
 def _build_context(results) -> str:
     """Build clean, deduplicated context from retrieved knowledge."""
     if not results:
@@ -293,6 +326,7 @@ def _generate_grounded_answer(
     client_config: dict | None,
     best_distance=None,
     history: str = "",
+    resolved_question: str = "",
 ):
     """Let Claude answer from retrieved knowledge instead of pre-rejecting it."""
     answer = generate_answer(
@@ -300,6 +334,7 @@ def _generate_grounded_answer(
         context=context,
         client_config=client_config,
         history=history,
+        resolved_question=resolved_question,
     )
 
     if not isinstance(answer, str) or not answer.strip():
@@ -459,14 +494,14 @@ def answer_question(
         logger.warning("Retrieval unavailable; continuing with client configuration")
         result_lists = []
 
-    results = [
+    results = _unique_answers([
         result
         for result in _merge(*result_lists)
         if (
             float(result.distance) <= MAX_DISTANCE
             or int(getattr(result, "keyword_hits", 0) or 0) > 0
         )
-    ]
+    ])
 
     if results:
         results = _rerank(search_query, results)
@@ -502,6 +537,7 @@ def answer_question(
         client_config=client_config,
         best_distance=best_distance,
         history=history,
+        resolved_question=search_query,
     )
 
     if grounded_result:
