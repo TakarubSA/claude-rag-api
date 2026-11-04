@@ -1,8 +1,10 @@
 import logging
+import re
+import time
 from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.clients.repository import get_client_by_token
 from app.knowledge.gaps_repository import insert_gap
@@ -13,6 +15,7 @@ from app.services.conversation_memory import (
     save_turn,
 )
 from app.services.intent import classify_intent
+from app.llm.claude import CASUAL_MARKER
 from app.services.rag import answer_question, build_search_query, executor
 
 
@@ -20,6 +23,10 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 MAX_CONTEXT_CHARS = 8000
+
+# A chat message longer than this is not a real question; it only costs
+# money (every message triggers several Claude calls).
+MAX_MESSAGE_CHARS = 2000
 MAX_CONTEXT_MESSAGES = 20
 
 CONTEXT_FIELD_NAMES = (
@@ -49,7 +56,7 @@ class ChatRequest(BaseModel):
     # Preserve integration-specific fields for diagnostics/history extraction.
     model_config = ConfigDict(extra="allow")
 
-    message: str
+    message: str = Field(max_length=MAX_MESSAGE_CHARS)
     conversation_context: Any = None
     conversation_id: str | None = None
     reset_conversation: bool = False
@@ -311,6 +318,39 @@ def is_lab_reading_request(message: str) -> bool:
     return any(phrase in normalized for phrase in LAB_READING_PHRASES)
 
 
+def _is_arabic(text: str) -> bool:
+    return bool(re.search(r"[\u0600-\u06FF]", text or ""))
+
+
+def _handoff_answer(message: str) -> str:
+    if is_lab_reading_request(message):
+        return (
+            "يسعدنا مساعدتك في قراءة نتائج التحاليل. "
+            "سيتم تحويلك الآن إلى فريق خدمة العملاء لاستكمال الإجراء 🌷"
+        )
+
+    if _is_arabic(message):
+        return (
+            "شكرًا لك، استلمنا المعلومات المطلوبة. "
+            "سيتم تحويل محادثتك إلى فريق خدمة العملاء "
+            "لمتابعة طلبك. يرجى الانتظار."
+        )
+
+    return (
+        "Thank you, we have received your request. Your conversation is "
+        "being transferred to our customer service team. Please wait."
+    )
+
+
+def _log_timing(client_id: int, path: str, started: float) -> None:
+    logger.info(
+        "Chat answered: client_id=%s path=%s total_ms=%.0f",
+        client_id,
+        path,
+        (time.perf_counter() - started) * 1000,
+    )
+
+
 @router.post("/chat")
 def chat(
     request: ChatRequest,
@@ -334,6 +374,7 @@ def chat(
     if client is None:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+    started = time.perf_counter()
     message = request.message.strip()
 
     if not message:
@@ -377,16 +418,7 @@ def chat(
         ),
         bool(stored_context),
     )
-    logger.info("Incoming request field names: %s", diagnostics["payload_fields"])
-    logger.info("Incoming extra field names: %s", diagnostics["extra_fields"])
-    logger.info(
-        "Possible conversation history fields: %s",
-        diagnostics["possible_context_fields"],
-    )
-    logger.info(
-        "Possible conversation identifier fields: %s",
-        diagnostics["possible_conversation_id_fields"],
-    )
+    logger.debug("Request diagnostics: %s", diagnostics)
 
     if not conversation_id:
         logger.warning(
@@ -394,6 +426,7 @@ def chat(
         )
 
     search_query_future = None
+    early_answer_future = None
 
     # Force handoff for lab-reading requests before calling the AI intent classifier.
     if is_lab_reading_request(message):
@@ -413,6 +446,21 @@ def chat(
             client_config=client.ai_config,
             conversation_context=conversation_context,
         )
+
+        # First message of a conversation: the rewrite does not change what
+        # retrieval finds (measured: same facts, same rank), so start the
+        # answer from the user's own words now instead of waiting ~0.8 s for
+        # it. Follow-ups keep waiting: there the rewrite resolves "كم سعره؟".
+        if not conversation_context:
+            early_answer_future = executor.submit(
+                answer_question,
+                question=message,
+                client_id=client.id,
+                client_config=client.ai_config,
+                conversation_context="",
+                search_query=message,
+            )
+
         intent = classify_intent(
             message=message,
             conversation_context=conversation_context,
@@ -421,17 +469,10 @@ def chat(
     logger.info("Intent classified: client_id=%s intent=%s", client.id, intent)
 
     if intent == "handoff":
-        handoff_answer = (
-            "أبشر، يسعدنا مساعدتك في قراءة التحاليل. "
-            "بحوّلك الآن إلى فريق خدمة العملاء لمساعدتك واستكمال الإجراء 🌷"
-            if is_lab_reading_request(message)
-            else (
-                "شكرًا لك، استلمنا المعلومات المطلوبة. "
-                "سيتم تحويل محادثتك إلى فريق خدمة العملاء "
-                "لمتابعة طلبك. يرجى الانتظار."
-            )
-        )
+        # An early answer, if one was started, is simply not used.
+        handoff_answer = _handoff_answer(message)
         save_turn(client.id, conversation_id, message, handoff_answer)
+        _log_timing(client.id, "handoff", started)
         return make_response(action="handoff", answer=handoff_answer)
 
     search_query = None
@@ -443,13 +484,26 @@ def chat(
             # answer_question() will rewrite the query itself.
             logger.exception("Parallel query rewrite failed: client_id=%s", client.id)
 
-    result = answer_question(
-        question=message,
-        client_id=client.id,
-        client_config=client.ai_config,
-        conversation_context=conversation_context,
-        search_query=search_query,
-    )
+    result = None
+    path = "standard"
+
+    # Casual messages ("هلا", "شكراً") get the casual reply, not the early
+    # answer; everything else uses the early answer when there is one.
+    if early_answer_future is not None and search_query != CASUAL_MARKER:
+        try:
+            result = early_answer_future.result()
+            path = "early"
+        except Exception:
+            logger.exception("Early answer failed: client_id=%s", client.id)
+
+    if result is None:
+        result = answer_question(
+            question=message,
+            client_id=client.id,
+            client_config=client.ai_config,
+            conversation_context=conversation_context,
+            search_query=search_query,
+        )
 
     if result.get("status") == "RELATED_BUT_UNKNOWN":
         # Gap tracking is analytics: never fail the user's answer over it.
@@ -466,6 +520,8 @@ def chat(
 
     if answer:
         save_turn(client.id, conversation_id, message, answer)
+
+    _log_timing(client.id, f"{path}/{result.get('status')}", started)
 
     return make_response(
         action=intent,

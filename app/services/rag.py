@@ -20,9 +20,13 @@ from app.llm.claude import (
 
 logger = logging.getLogger(__name__)
 
-# Shared pool for I/O that can overlap (Claude calls, DB searches).
-# Kept small so concurrent requests stay within the DB connection pool.
-executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix="rag")
+# Two pools so a task never waits on work queued behind it in its own pool
+# (which deadlocks under load):
+# - executor: request-level work (Claude calls, a whole early answer).
+# - search_executor: DB searches only; never waits on anything itself.
+#   Kept within the SQLAlchemy connection pool (5 + 10 overflow).
+executor = ThreadPoolExecutor(max_workers=32, thread_name_prefix="rag")
+search_executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix="search")
 
 SEARCH_LIMIT = 60  # many entries are rephrasings of one answer; see _unique_answers
 CONTEXT_LIMIT = 6
@@ -183,7 +187,7 @@ def _search_many(texts: list[str], client_id: int):
 
         # Each search is an independent DB round trip: run them in parallel.
         futures = [
-            executor.submit(
+            search_executor.submit(
                 search_knowledge,
                 embedding,
                 client_id=client_id,
