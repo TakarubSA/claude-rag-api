@@ -29,6 +29,18 @@ MODEL = os.getenv(
 
 CASUAL_MARKER = "__CASUAL_CONVERSATION__"
 
+# Reply style for every user-facing prompt. A client's own Brand Voice
+# (ai_config.brand_voice) takes precedence over this default.
+RESPONSE_STYLE = """
+- Answer in the same language as the user.
+- Use a slightly formal, professional tone: polite and warm, but not
+  casual. In Arabic, write in clear, simple Modern Standard Arabic
+  (فصحى مبسطة) even when the user writes in dialect; avoid dialect and
+  slang words such as أبغى، وش، عشان، تبي، تصير، أقدر، حياك.
+- Do not be stiff, overly classical, or wordy.
+- If the client's Brand Voice above says otherwise, follow the Brand Voice.
+""".strip()
+
 
 # ----------------------------------------------------------------------
 # Client configuration helpers
@@ -566,7 +578,7 @@ def generate_casual_answer(
         "RECENT CONVERSATION",
         "Use this only to keep the reply natural: if the conversation is "
         "already under way, do not greet or welcome the user again as if "
-        "they just arrived, and match their dialect. Do not repeat or add "
+        "they just arrived. Do not repeat or add "
         "business facts from it.",
         limit=1500,
     )
@@ -589,9 +601,7 @@ Respond naturally and briefly.
 RULES
 ==================================================
 
-- Reply in the same language as the user.
-- Match the user's tone.
-- Be warm and natural.
+{RESPONSE_STYLE}
 - Keep it to 1-2 short sentences.
 - You may identify yourself as the assistant of the business.
 - Do not invent business facts.
@@ -607,25 +617,25 @@ User:
 كيفك؟
 
 Response:
-بخير الحمد لله 🌷 كيف أقدر أساعدك؟
+بخير والحمد لله 🌷 كيف يمكنني مساعدتك؟
 
 User:
 يعطيكم العافية
 
 Response:
-الله يعافيك 🌷 حياك الله.
+الله يعافيك 🌷 أهلًا وسهلًا بك.
 
 User:
 شكراً
 
 Response:
-العفو، حياك الله 🌷
+العفو، يسعدنا خدمتك دائمًا 🌷
 
 User:
 السلام عليكم
 
 Response:
-وعليكم السلام ورحمة الله وبركاته 🌷 حياك الله.
+وعليكم السلام ورحمة الله وبركاته 🌷 أهلًا وسهلًا بك، كيف يمكنني مساعدتك؟
 
 User:
 hi
@@ -647,7 +657,7 @@ USER
         return result
 
     if _is_arabic(question):
-        return "حياك الله 🌷 كيف أقدر أساعدك؟"
+        return "أهلًا وسهلًا بك 🌷 كيف يمكنني مساعدتك؟"
 
     return "Hello 🌷 How can I help you today?"
 
@@ -686,7 +696,7 @@ def generate_answer(
         resolved_block = f"""
 In the context of the conversation, this message means:
 {resolved_question}
-Answer that. Keep the language and dialect of the user's own message.
+Answer that, in the language of the user's own message.
 """
 
     website_instruction = (
@@ -698,8 +708,8 @@ Answer that. Keep the language and dialect of the user's own message.
     history_block = _history_block(
         history,
         "CONVERSATION HISTORY",
-        "Use this to understand what the user's latest message refers to "
-        "and to match the user's dialect. Facts must come from the "
+        "Use this to understand what the user's latest message refers to. "
+        "Facts must come from the "
         "retrieved knowledge, never from earlier assistant messages.",
     )
 
@@ -790,11 +800,12 @@ CONTEXT AND DIALECT
 ==================================================
 
 - Always read the latest message in the context of the conversation.
-- Answer in the same language as the user.
-- Match the user's dialect and tone (Saudi, Hijazi, Gulf, Egyptian,
-  etc.). If the user writes casually, answer casually. Keep it
-  natural and polite, not stiff.
+- Understand any dialect (Saudi, Hijazi, Gulf, Egyptian, etc.), but
+  reply in the style below.
 - Do not mention spelling mistakes.
+
+STYLE:
+{RESPONSE_STYLE}
 
 ==================================================
 SAFETY
@@ -1164,7 +1175,7 @@ def generate_fallback_answer(
 
         if arabic:
             response = (
-                "عذرًا، ما أقدر أقدّم نصيحة طبية شخصية أو تشخيصًا 🌷\n"
+                "عذرًا، لا يمكنني تقديم نصيحة طبية شخصية أو تشخيص 🌷\n"
                 "للحصول على المساعدة المناسبة، يُفضّل التواصل "
                 "مع مختص أو استخدام الخدمة المناسبة المتوفرة "
                 "لدى الجهة."
@@ -1193,7 +1204,7 @@ def generate_fallback_answer(
 
         if arabic:
             response = (
-                f"أنا مساعد {client_name}، وأقدر أساعدك "
+                f"أنا مساعد {client_name}، ويسعدني مساعدتك "
                 "في الأسئلة المتعلقة بخدمات الجهة ومعلوماتها."
             )
 
@@ -1220,11 +1231,11 @@ def generate_fallback_answer(
 
     # RELATED_BUT_UNKNOWN: ask for clarification and point to the website.
     if arabic:
-        response = "ممكن توضّح سؤالك أكثر عشان أساعدك؟ 🌷"
+        response = "هل يمكنك توضيح سؤالك أكثر حتى أتمكن من مساعدتك؟ 🌷"
 
         if website_url:
             response += (
-                "\nوتقدر تتصفح الموقع الرسمي:\n"
+                "\nويمكنك أيضًا زيارة الموقع الرسمي:\n"
                 f"{website_url}"
             )
 
