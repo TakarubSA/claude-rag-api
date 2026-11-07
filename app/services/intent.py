@@ -110,7 +110,9 @@ THIS BUSINESS'S HANDOFF POLICIES (highest priority):
 
 When the customer's message is exactly the kind of request or question
 a policy above describes, follow that policy. Apply a policy only to
-the cases it names; never stretch it to other topics.
+the cases it names; never stretch it to other topics. For example, a
+policy about asking for the contact number does not cover questions
+about locations, branches, or opening hours.
 
 ==================================================
 2. GENERAL RULES (when no policy covers the message)
@@ -125,8 +127,11 @@ a) The customer explicitly asks for a person, employee, agent,
 b) The customer explicitly asks staff to act on something of theirs
    that ALREADY EXISTS: cancel or change their existing booking or
    order, refund a payment they made, fix a wrong charge, or tell
-   them the status or result of their own existing order or request
-   ("وين طلبي؟", "طلبي تأخر", "وش صار على طلبي؟").
+   them the status or result of their own existing order or request.
+   The message must point to their own specific item ("وين طلبي؟",
+   "طلبي تأخر", "وش صار على طلبي؟"). A general question about how
+   long something usually takes ("متى يجهز الطلب عادة؟", "كم ياخذ
+   التوصيل؟") is information: "reply".
 c) The customer says they want to ask or need help but names no
    subject, and the history does not supply one (intent "unclear").
 
