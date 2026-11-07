@@ -17,7 +17,12 @@ from app.services.conversation_memory import (
     save_turn,
 )
 from app.services.intent import classify_intent
-from app.services.rag import answer_question, build_search_query, executor
+from app.services.rag import (
+    answer_question,
+    build_search_query,
+    executor,
+    knowledge_for_intent,
+)
 
 
 router = APIRouter()
@@ -291,6 +296,7 @@ def _is_arabic(text: str) -> bool:
 
 
 def _handoff_answer(message: str) -> str:
+    """Generic handoff text, used when the classifier did not write one."""
     if _is_arabic(message):
         return (
             "شكرًا لك، استلمنا طلبك. "
@@ -402,10 +408,22 @@ def chat(
         conversation_context=conversation_context,
     )
 
+    # The routing step reads the client's own knowledge: each business
+    # defines there which cases go to staff and how to contact it.
+    try:
+        intent_knowledge = knowledge_for_intent(
+            message,
+            client.id,
+            conversation_context,
+        )
+    except Exception:
+        logger.exception("Routing knowledge lookup failed: client_id=%s", client.id)
+        intent_knowledge = ""
+
     decision = classify_intent(
         message=message,
         conversation_context=conversation_context,
-        client_config=client.ai_config,
+        knowledge=intent_knowledge,
     )
 
     intent = decision["action"]
@@ -444,7 +462,7 @@ def chat(
 
     if intent == "handoff":
         # The query rewrite, if still running, is simply not used.
-        handoff_answer = _handoff_answer(message)
+        handoff_answer = decision.get("handoff_message") or _handoff_answer(message)
         save_turn(client.id, conversation_id, message, handoff_answer)
         _log_timing(client.id, "handoff", started)
         return make_response(action="handoff", answer=handoff_answer)

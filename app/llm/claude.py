@@ -500,6 +500,9 @@ thanks
 If the message contains a real business request,
 it is NOT casual.
 
+A short statement that names a service or topic is a query, even
+without a question mark: "التوصيل مجاني" means "is delivery free?".
+
 Example:
 
 السلام عليكم، ابغى احجز

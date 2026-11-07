@@ -362,6 +362,45 @@ def _history(conversation_context: str | None) -> str:
     return trim_history(conversation_context, MAX_HISTORY_CHARS)
 
 
+INTENT_CONTEXT_LIMIT = 5
+
+
+def knowledge_for_intent(
+    question: str,
+    client_id: int,
+    conversation_context: str | None = None,
+) -> str:
+    """
+    The client's knowledge most related to the raw message, for the routing
+    step: it carries the business's own handoff policy and contact details.
+    Plain embedding search only (no Claude call), so it is fast.
+    """
+    cleaned_question = _clean_text(question)
+
+    if not cleaned_question:
+        return ""
+
+    texts = [cleaned_question]
+
+    # A follow-up ("طيب الغيه") needs the previous turn to find its topic.
+    previous_user = _latest_user_message(_history(conversation_context))
+    if previous_user:
+        texts.append(f"{previous_user} {cleaned_question}")
+
+    result_lists = _search_many(texts, client_id) or []
+
+    results = _unique_answers([
+        result
+        for result in _merge(*result_lists)
+        if (
+            float(result.distance) <= MAX_DISTANCE
+            or int(getattr(result, "keyword_hits", 0) or 0) > 0
+        )
+    ])[:INTENT_CONTEXT_LIMIT]
+
+    return _build_context(results)
+
+
 def build_search_query(
     question: str,
     client_config: dict | None = None,
