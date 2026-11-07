@@ -1,3 +1,4 @@
+import contextvars
 import logging
 import re
 import time
@@ -8,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.clients.repository import get_client_by_token
 from app.knowledge.gaps_repository import insert_gap
+from app.llm.usage import use_client
 from app.services.history import drop_current_message, trim_history
 from app.services.conversation_memory import (
     clear_conversation,
@@ -15,7 +17,7 @@ from app.services.conversation_memory import (
     save_turn,
 )
 from app.services.intent import classify_intent
-from app.services.rag import answer_question, build_search_query
+from app.services.rag import answer_question, build_search_query, executor
 
 
 router = APIRouter()
@@ -335,6 +337,9 @@ def chat(
     if client is None:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+    # Claude calls for this request use the provider's key and are billed to it.
+    use_client(client.id, client.anthropic_api_key)
+
     started = time.perf_counter()
     message = request.message.strip()
 
@@ -386,10 +391,21 @@ def chat(
             "No conversation_id provided; temporary memory is disabled for this request."
         )
 
-    # Understand the customer's intent before starting RAG work.
+    # Rewrite the search query while the intent is classified: the two
+    # Claude calls are independent. copy_context() keeps this request's
+    # provider key and usage tracking in the worker thread.
+    search_query_future = executor.submit(
+        contextvars.copy_context().run,
+        build_search_query,
+        message,
+        client_config=client.ai_config,
+        conversation_context=conversation_context,
+    )
+
     decision = classify_intent(
         message=message,
         conversation_context=conversation_context,
+        client_config=client.ai_config,
     )
 
     intent = decision["action"]
@@ -427,7 +443,7 @@ def chat(
         )
 
     if intent == "handoff":
-        # An early answer, if one was started, is simply not used.
+        # The query rewrite, if still running, is simply not used.
         handoff_answer = _handoff_answer(message)
         save_turn(client.id, conversation_id, message, handoff_answer)
         _log_timing(client.id, "handoff", started)
@@ -436,11 +452,7 @@ def chat(
     search_query = None
 
     try:
-        search_query = build_search_query(
-            message,
-            client_config=client.ai_config,
-            conversation_context=conversation_context,
-        )
+        search_query = search_query_future.result()
     except Exception:
         # answer_question can still perform its own query preparation.
         logger.exception(
@@ -455,8 +467,6 @@ def chat(
         conversation_context=conversation_context,
         search_query=search_query,
     )
-
-    path = "standard"
 
     if result.get("status") == "RELATED_BUT_UNKNOWN":
         # Gap tracking is analytics: never fail the user's answer over it.
@@ -474,7 +484,7 @@ def chat(
     if answer:
         save_turn(client.id, conversation_id, message, answer)
 
-    _log_timing(client.id, f"{path}/{result.get('status')}", started)
+    _log_timing(client.id, f"answer/{result.get('status')}", started)
 
     return make_response(
         action=intent,

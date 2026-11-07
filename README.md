@@ -104,16 +104,25 @@ The response includes the number of text entries ingested. Uploading adds rows; 
 app/
   auth/         Password and JWT helpers
   clients/      Client token lookup
-  database/     SQLAlchemy database connection
-  documents/    JSON knowledge parsing
+  dashboard/    Admin/provider dashboard queries
+  database/     SQLAlchemy connection and startup migrations
+  documents/    JSON / Markdown / text knowledge parsing
   embeddings/   Local multilingual embedding model
   knowledge/    Ingestion, retrieval, and unanswered-question storage
-  llm/          Claude integration
-  routes/       Chat and knowledge-upload endpoints
+  llm/          Claude integration and per-provider usage tracking
+  routes/       Chat, knowledge-upload, and dashboard (/api) endpoints
   services/     RAG pipeline, intent, and conversation memory
 data/           Example knowledge data
+create_admin.py       Create a dashboard admin account
 reembed_knowledge.py  Local-database embedding migration utility
 ```
+
+## Dashboard
+
+The admin/provider dashboard is a separate project: `../claude-rag-dashboard`.
+Create the first admin with `python create_admin.py admin@example.com "Admin Name"`,
+and set `DASHBOARD_ORIGINS` (comma-separated) if the dashboard is not served from
+`http://localhost:5173`.
 
 ## Known limitations and weaknesses
 
@@ -125,7 +134,3 @@ reembed_knowledge.py  Local-database embedding migration utility
 ## Maintenance utility
 
 `reembed_knowledge.py` previews the existing knowledge records and then, when invoked with `--apply`, updates their vectors in batches. It deliberately refuses databases whose host is not localhost or whose database name is not `ragdb`. Back up the database before applying a migration, and confirm those safeguards match your local setup.
-
-## Tests and scripts
-
-The repository contains standalone Python scripts named `test_*.py`, but they are not organized as a standard automated test suite and some are manual API/model checks. Review their inputs and environment requirements before running them; they may call external services or require a configured database.

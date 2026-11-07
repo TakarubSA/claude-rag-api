@@ -3,9 +3,10 @@ import logging
 import os
 import re
 
-import anthropic
 from dotenv import load_dotenv
 
+from app.llm.claude import _format_rules
+from app.llm.usage import create_message
 from app.services.history import trim_history
 
 load_dotenv()
@@ -15,10 +16,6 @@ logger = logging.getLogger(__name__)
 MODEL = os.getenv(
     "ANTHROPIC_INTENT_MODEL",
     os.getenv("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001"),
-)
-
-client = anthropic.Anthropic(
-    api_key=os.getenv("ANTHROPIC_API_KEY")
 )
 
 # These values are API labels, not phrase-matching rules.
@@ -39,30 +36,37 @@ VALID_ACTIONS = {"reply", "handoff"}
 
 def _default_clarification(message: str) -> str:
     if re.search(r"[\u0600-\u06FF]", message or ""):
-        return "أكيد، ممكن توضح لي أكثر ما الذي تحتاج المساعدة فيه؟"
+        return "بكل سرور، ما الذي تود الاستفسار عنه؟"
 
-    return "Of course. Could you tell me a little more about what you need help with?"
+    return "Of course. What would you like to ask about?"
 
 
 def fallback_decision(reason: str, message: str = "") -> dict:
+    # When classification fails, let the RAG pipeline answer rather than
+    # asking every customer to rephrase.
     return {
         "intent": "unclear",
         "action": "reply",
         "reason": reason,
-        "needs_clarification": True,
-        "clarification_question": _default_clarification(message),
+        "needs_clarification": False,
+        "clarification_question": "",
     }
 
 
 def classify_intent(
     message: str,
     conversation_context: str = "",
+    client_config: dict | None = None,
 ) -> dict:
     """
     Interpret the customer's current goal using semantic context.
 
     This function classifies the conversation. It does not answer
     the customer and does not execute business operations.
+
+    client_config["handoff_rules"] (a list of plain-language rules) lets
+    each client define in advance which cases go to staff; these take
+    priority over the general rules below.
     """
 
     message = (message or "").strip()
@@ -84,6 +88,11 @@ def classify_intent(
         ensure_ascii=False,
     )
 
+    handoff_rules = _format_rules(
+        (client_config or {}).get("handoff_rules"),
+        "None. Use the general rules.",
+    )
+
     prompt = f"""
 You are the intent-understanding and routing engine for the current tenant.
 
@@ -103,7 +112,7 @@ Return exactly one JSON object with these fields:
 {{
   "intent": "one valid intent",
   "action": "reply or handoff",
-  "reason": "short explanation",
+  "reason": "at most 8 words",
   "needs_clarification": false,
   "clarification_question": ""
 }}
@@ -120,84 +129,80 @@ VALID INTENTS:
 - complaint
 - unclear
 
-UNDERSTANDING THE CUSTOMER:
+THIS CLIENT'S HANDOFF RULES (highest priority):
+These were defined by the business. When the message matches one of
+them, follow it, even if a general rule below says otherwise.
+{handoff_rules}
 
-1. Interpret meaning, not isolated words.
-   The same subject can appear in a question, a request, a complaint,
-   a follow-up, or a hypothetical scenario. These are not the same intent.
+GENERAL RULES: DECIDE BY WHAT THE CUSTOMER WANTS DONE, NOT BY THE TOPIC:
 
-2. Interpret the latest message using previous turns when necessary.
-   Resolve references such as "that", "it", "the previous one",
-   "do it", "yes", and similar expressions from conversation context.
+1. INFORMATION -> action "reply".
+   Any question about a service, price, policy, timing, availability,
+   requirement, or how something works ("how / when / how much /
+   is there / do you"). This chat answers these from the tenant's
+   knowledge. Exception: rule 2.
 
-3. A question about a service, its availability, requirements,
-   process, eligibility, or policy is an information request.
-   Choose action "reply".
+2. CANCELLING OR CHANGING A BOOKING -> action "handoff".
+   Any message about cancelling, rescheduling, or changing a booking
+   or appointment goes to staff, including questions about HOW to
+   cancel or reschedule.
 
-4. A clear request to have a service or operation performed is an
-   execution request. Determine whether this chat can actually perform it.
+3. OPERATION ON THE CUSTOMER'S OWN CASE -> action "handoff".
+   The customer asks for something to be done for them now: book,
+   modify, refund, or check THEIR booking, order, payment, or result.
+   This chat cannot perform or look up these.
+   "Do you deliver / provide / offer X?" is a question about the
+   service (rule 1), not a request to do it.
 
-5. This chat route has knowledge retrieval and response generation,
-   but no operation tool is exposed here to create or modify bookings,
-   process transactions, access private customer records, or perform
-   a requested healthcare service.
-   Do not claim these operations have been completed.
-   When the customer clearly asks for an operation that this chat
-   cannot perform, choose action "handoff".
+4. HUMAN REQUEST -> action "handoff".
+   The customer explicitly asks for a person, employee, agent, manager,
+   or customer service.
 
-6. A request for instructions about how an operation works is not
-   permission to perform that operation. Choose "reply".
+5. NO SUBJECT -> intent "unclear", action "handoff".
+   The message states a wish to ask or get help but gives no subject
+   at all, and the history does not supply one. Staff will follow up.
+   When a subject is present, even a short or misspelled one, use
+   rule 1: retrieval can answer it.
 
-7. Explicit requests to speak to a human or customer-support employee
-   require "handoff".
+6. GREETINGS, THANKS, SMALL TALK -> intent "general_inquiry",
+   action "reply", needs_clarification false.
 
-8. A complaint does not automatically require handoff.
-   Understand the reported problem. If the customer needs an
-   investigation, account-specific action, or intervention unavailable
-   to this chat, choose "handoff". Otherwise reply or clarify.
+7. A complaint that only describes a problem is information (rule 1):
+   the knowledge explains how complaints are handled. Hand off only
+   when the customer asks someone to act on their case.
 
-9. Do not transfer a customer merely because they mention an order,
-   appointment, payment, service, refund, cancellation, or support.
-   Determine what they are asking you to do.
+8. Use the conversation history to resolve short follow-ups
+   ("yes", "that one", "cancel it", "how much?"). Classify a new
+   topic on its own; do not carry an earlier handoff forward.
 
-10. A vague request for help is not automatically an operational request.
-    Do not infer missing details. Choose intent "unclear",
-    action "reply", set "needs_clarification" to true, and ask one
-    concise question that would help identify the customer's goal.
+9. A health symptom or a question about whether a service suits a
+   person is information (rule 1), not an operation.
 
-11. If the message is ambiguous but the history makes its meaning clear,
-    use the history instead of asking the customer to repeat themselves.
+EXAMPLES (any dialect or spelling works the same way):
 
-12. If the customer changes topic, classify the new topic independently.
-    Do not carry an earlier handoff decision into an unrelated message.
+- "وش سياسة الاسترجاع" -> service_inquiry, reply
+- "متى تطلع النتايج" -> service_inquiry, reply
+- "عندي شكوى على الخدمة" -> complaint, reply
+- "ولدي حرارته مرتفعه" -> service_inquiry, reply
+- "العلاج يحتاج تبريد توصلونه؟" -> service_inquiry, reply
+- "كيف اكنسل الحجز؟" -> booking_inquiry, handoff
+- "ابغا الغي موعدي" -> booking_request, handoff
+- "أبي أأجل موعدي لبكرة" -> reschedule_request, handoff
+- "احجز لي موعد" -> booking_request, handoff
+- "وين وصل طلبي؟" -> service_request, handoff
+- "ابي اكلم موظف" -> human_request, handoff
+- "ابغا استفسر عن شي معين" -> unclear, handoff
+- "عندي سؤال" -> unclear, handoff
+- "السلام عليكم" / "شكرا" -> general_inquiry, reply
 
-13. Do not assume or invent tenant-specific policies, prices,
-    service availability, or customer-specific facts. These must be
-    determined from the current tenant's configuration and knowledge.
+Always set needs_clarification to false and clarification_question
+to "": vague messages are handed off (rule 5), not clarified.
 
-ACTION DEFINITIONS:
-
-- reply:
-  The customer needs information, an explanation, guidance, or
-  clarification that can be handled in this chat.
-
-- handoff:
-  The customer clearly requires a human or an operation that this
-  chat cannot perform.
-
-CLARIFICATION:
-
-- Set needs_clarification=true only when essential information is
-  missing to understand the customer's goal.
-- When needs_clarification=true, action must be "reply".
-- Provide one natural clarification_question in the customer's language.
-- Otherwise set needs_clarification=false and clarification_question="".
-
-Return valid JSON only. Do not use Markdown or add text outside JSON.
+Return the JSON object only: no code fences, no text before or after.
 """.strip()
 
     try:
-        response = client.messages.create(
+        response = create_message(
             model=MODEL,
             max_tokens=240,
             messages=[
@@ -251,10 +256,6 @@ Return valid JSON only. Do not use Markdown or add text outside JSON.
         if not isinstance(clarification_question, str):
             raise ValueError("Invalid clarification_question value.")
 
-        # An unclear intent must clarify instead of transferring.
-        if intent == "unclear":
-            needs_clarification = True
-
         # A request for clarification is always a customer-facing reply.
         if needs_clarification:
             action = "reply"
@@ -284,6 +285,6 @@ Return valid JSON only. Do not use Markdown or add text outside JSON.
     except Exception:
         logger.exception("Intent classification failed.")
         return fallback_decision(
-            "Intent classification failed; clarification required.",
+            "Intent classification failed; answering from knowledge.",
             message,
         )

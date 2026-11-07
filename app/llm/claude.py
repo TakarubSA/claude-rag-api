@@ -5,17 +5,13 @@ import re
 import anthropic
 from dotenv import load_dotenv
 
+from app.llm.usage import create_message
 from app.services.history import trim_history
 
 
 load_dotenv()
 
 logger = logging.getLogger(__name__)
-
-
-client = anthropic.Anthropic(
-    api_key=os.getenv("ANTHROPIC_API_KEY")
-)
 
 
 # ----------------------------------------------------------------------
@@ -208,7 +204,7 @@ def _call_claude(
         )
 
         try:
-            response = client.messages.create(
+            response = create_message(
                 model=MODEL,
                 max_tokens=budget,
                 messages=[

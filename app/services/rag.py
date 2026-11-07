@@ -1,3 +1,4 @@
+import contextvars
 import logging
 import os
 import re
@@ -22,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 # Two pools so a task never waits on work queued behind it in its own pool
 # (which deadlocks under load):
-# - executor: request-level work (Claude calls, a whole early answer).
+# - executor: request-level Claude calls run alongside the request thread.
 # - search_executor: DB searches only; never waits on anything itself.
 #   Kept within the SQLAlchemy connection pool (5 + 10 overflow).
 executor = ThreadPoolExecutor(max_workers=32, thread_name_prefix="rag")
@@ -537,12 +538,29 @@ def answer_question(
     # Evaluate whether the retrieved evidence or configured business
     # rules can support a useful answer. Search results are not treated
     # as a complete catalogue.
-    evidence_status = check_context_relevance(
+    # The check and the answer are independent Claude calls, so they run
+    # at the same time; the answer is discarded if the check says the
+    # question is not answerable. copy_context() keeps this request's
+    # provider key and usage tracking in the worker thread.
+    evidence_future = executor.submit(
+        contextvars.copy_context().run,
+        check_context_relevance,
         question=search_query or cleaned_question,
         context=knowledge_context,
         client_config=client_config,
         history=history,
     )
+
+    grounded_result = _generate_grounded_answer(
+        question=cleaned_question,
+        context=knowledge_context,
+        client_config=client_config,
+        best_distance=best_distance,
+        history=history,
+        resolved_question=search_query,
+    )
+
+    evidence_status = evidence_future.result()
 
     logger.info(
         "Evidence evaluation: client_id=%s status=%s result_count=%s",
@@ -576,16 +594,6 @@ def answer_question(
             "best_distance": best_distance,
             "status": "SEARCH_ERROR" if search_failed else gap_type,
         }
-
-    # Claude receives the actual latest message and history separately.
-    grounded_result = _generate_grounded_answer(
-        question=cleaned_question,
-        context=knowledge_context,
-        client_config=client_config,
-        best_distance=best_distance,
-        history=history,
-        resolved_question=search_query,
-    )
 
     if grounded_result:
         if search_failed or not results:

@@ -12,7 +12,8 @@ GET_CLIENT_BY_TOKEN_QUERY = text("""
     SELECT
         id,
         name,
-        ai_config
+        ai_config,
+        anthropic_api_key
     FROM clients
     WHERE token = :token
     LIMIT 1
