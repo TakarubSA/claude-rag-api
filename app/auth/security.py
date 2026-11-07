@@ -1,3 +1,4 @@
+import logging
 import os
 from datetime import datetime, timedelta, timezone
 
@@ -8,12 +9,16 @@ from pwdlib import PasswordHash
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 password_hash = PasswordHash.recommended()
 
 JWT_SECRET = os.getenv("JWT_SECRET")
 
+# Only dashboard logins need this: without it the chat API keeps working
+# and dashboard login is refused.
 if not JWT_SECRET:
-    raise RuntimeError("JWT_SECRET is not configured")
+    logger.error("JWT_SECRET is not configured; dashboard login is disabled")
 
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_HOURS = 12
@@ -45,6 +50,9 @@ def create_access_token(
         "exp": datetime.now(timezone.utc) + timedelta(hours=ACCESS_TOKEN_HOURS),
     }
 
+    if not JWT_SECRET:
+        raise RuntimeError("JWT_SECRET is not configured")
+
     return jwt.encode(
         payload,
         JWT_SECRET,
@@ -54,6 +62,9 @@ def create_access_token(
 
 def decode_access_token(token: str) -> dict | None:
     """Return the token's payload, or None if it is invalid or expired."""
+    if not JWT_SECRET:
+        return None
+
     try:
         return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     except jwt.PyJWTError:

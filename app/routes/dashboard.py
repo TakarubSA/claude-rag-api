@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from app.auth.security import (
+    JWT_SECRET,
     create_access_token,
     decode_access_token,
     hash_password,
@@ -71,6 +72,12 @@ def require_provider(user: dict = Depends(current_user)) -> dict:
 
 @router.post("/auth/login")
 def login(request: LoginRequest):
+    if not JWT_SECRET:
+        raise HTTPException(
+            status_code=503,
+            detail="Dashboard login is not configured (JWT_SECRET is missing)",
+        )
+
     user = repository.get_user_by_email(request.email.strip())
 
     if user is None or user.role not in ("admin", "provider") or not verify_password(
