@@ -215,8 +215,11 @@ or after:
         reason = decision.get("reason", "")
         contact_details = decision.get("contact_details", "")
 
+        # The label is only for logs; an invented one must not throw away
+        # a valid reply/handoff decision.
         if intent not in VALID_INTENTS:
-            raise ValueError(f"Invalid intent: {intent!r}")
+            logger.info("Unknown intent label %r; using general_inquiry", intent)
+            intent = "general_inquiry"
 
         if action not in VALID_ACTIONS:
             raise ValueError(f"Invalid action: {action!r}")
