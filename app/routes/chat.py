@@ -21,7 +21,7 @@ from app.services.rag import (
     answer_question,
     build_search_query,
     executor,
-    knowledge_for_intent,
+    handoff_policies,
 )
 
 
@@ -295,20 +295,26 @@ def _is_arabic(text: str) -> bool:
     return bool(re.search(r"[\u0600-\u06FF]", text or ""))
 
 
-def _handoff_answer(message: str) -> str:
-    """Generic handoff text, used when the classifier did not write one."""
+def _handoff_answer(message: str, contact_details: str = "") -> str:
+    """Fixed handoff text, plus contact details from the client's policy."""
     if _is_arabic(message):
-        return (
+        answer = (
             "شكرًا لك، استلمنا طلبك. "
             "سيتم تحويل محادثتك إلى فريق خدمة العملاء "
             "لمتابعة طلبك. يرجى الانتظار."
         )
+        if contact_details:
+            answer += f"\nويمكنك أيضًا التواصل معنا على: {contact_details}"
+        return answer
 
-    return (
+    answer = (
         "Thank you, we have received your request. "
         "Your conversation is being transferred to our "
         "customer service team. Please wait."
     )
+    if contact_details:
+        answer += f"\nYou can also reach us at: {contact_details}"
+    return answer
 
 
 def _log_timing(client_id: int, path: str, started: float) -> None:
@@ -408,22 +414,18 @@ def chat(
         conversation_context=conversation_context,
     )
 
-    # The routing step reads the client's own knowledge: each business
-    # defines there which cases go to staff and how to contact it.
+    # Each business defines its own handoff cases and contact details as
+    # knowledge entries labelled "سياسة التحويل" / "Handoff policy".
     try:
-        intent_knowledge = knowledge_for_intent(
-            message,
-            client.id,
-            conversation_context,
-        )
+        policies = handoff_policies(client.id)
     except Exception:
-        logger.exception("Routing knowledge lookup failed: client_id=%s", client.id)
-        intent_knowledge = ""
+        logger.exception("Handoff policy lookup failed: client_id=%s", client.id)
+        policies = ""
 
     decision = classify_intent(
         message=message,
         conversation_context=conversation_context,
-        knowledge=intent_knowledge,
+        handoff_policies=policies,
     )
 
     intent = decision["action"]
@@ -462,7 +464,7 @@ def chat(
 
     if intent == "handoff":
         # The query rewrite, if still running, is simply not used.
-        handoff_answer = decision.get("handoff_message") or _handoff_answer(message)
+        handoff_answer = _handoff_answer(message, decision.get("contact_details", ""))
         save_turn(client.id, conversation_id, message, handoff_answer)
         _log_timing(client.id, "handoff", started)
         return make_response(action="handoff", answer=handoff_answer)

@@ -6,7 +6,10 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from app.embeddings.voyage import create_embeddings
-from app.knowledge.repository import search_knowledge
+from app.knowledge.repository import (
+    get_handoff_policy_candidates,
+    search_knowledge,
+)
 from app.services.history import trim_history
 from app.llm.claude import (
     CASUAL_MARKER,
@@ -362,43 +365,34 @@ def _history(conversation_context: str | None) -> str:
     return trim_history(conversation_context, MAX_HISTORY_CHARS)
 
 
-INTENT_CONTEXT_LIMIT = 5
+# A business writes its handoff policy as knowledge entries that start with
+# one of these labels, e.g. "سياسة التحويل: طلبات إلغاء المواعيد تحول للموظف".
+# Only these entries steer routing; other entries that merely mention a
+# transfer ("سيتم تحويلها للقسم المختص") do not.
+HANDOFF_POLICY_LABELS = ("سياسة التحويل", "handoff policy")
+POLICY_LABEL_WINDOW = 40  # the label must appear at the start of the entry
+MAX_HANDOFF_POLICIES = 30
 
 
-def knowledge_for_intent(
-    question: str,
-    client_id: int,
-    conversation_context: str | None = None,
-) -> str:
-    """
-    The client's knowledge most related to the raw message, for the routing
-    step: it carries the business's own handoff policy and contact details.
-    Plain embedding search only (no Claude call), so it is fast.
-    """
-    cleaned_question = _clean_text(question)
+def is_handoff_policy(content: str) -> bool:
+    head = (content or "").strip()[:POLICY_LABEL_WINDOW].casefold()
+    return any(label in head for label in HANDOFF_POLICY_LABELS)
 
-    if not cleaned_question:
-        return ""
 
-    texts = [cleaned_question]
-
-    # A follow-up ("طيب الغيه") needs the previous turn to find its topic.
-    previous_user = _latest_user_message(_history(conversation_context))
-    if previous_user:
-        texts.append(f"{previous_user} {cleaned_question}")
-
-    result_lists = _search_many(texts, client_id) or []
-
-    results = _unique_answers([
-        result
-        for result in _merge(*result_lists)
-        if (
-            float(result.distance) <= MAX_DISTANCE
-            or int(getattr(result, "keyword_hits", 0) or 0) > 0
+def handoff_policies(client_id: int) -> str:
+    """All of this client's handoff policy entries (a few lines, no search)."""
+    entries = [
+        content
+        for content in get_handoff_policy_candidates(
+            client_id,
+            HANDOFF_POLICY_LABELS,
+            POLICY_LABEL_WINDOW,
+            MAX_HANDOFF_POLICIES,
         )
-    ])[:INTENT_CONTEXT_LIMIT]
+        if is_handoff_policy(content)
+    ]
 
-    return _build_context(results)
+    return "\n".join(f"- {' '.join(entry.split())}" for entry in entries)
 
 
 def build_search_query(
@@ -545,6 +539,7 @@ def answer_question(
             float(result.distance) <= MAX_DISTANCE
             or int(getattr(result, "keyword_hits", 0) or 0) > 0
         )
+        and not is_handoff_policy(result.content)
     ])
 
     if results:

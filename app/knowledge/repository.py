@@ -130,3 +130,30 @@ def search_knowledge(
             "n": limit,
             "q": ts_query,
         }).fetchall()
+
+
+def get_handoff_policy_candidates(
+    client_id: int,
+    labels: tuple[str, ...],
+    window: int,
+    limit: int,
+) -> list[str]:
+    """Entries whose first `window` characters contain one of `labels`."""
+    conditions = " OR ".join(
+        f"left(ltrim(content), :window) ILIKE :label{i}"
+        for i in range(len(labels))
+    )
+    params = {f"label{i}": f"%{label}%" for i, label in enumerate(labels)}
+
+    with engine.connect() as connection:
+        rows = connection.execute(
+            text(f"""
+                SELECT content FROM knowledge
+                WHERE client_id = :client_id AND ({conditions})
+                ORDER BY id
+                LIMIT :limit
+            """),
+            {"client_id": client_id, "window": window, "limit": limit, **params},
+        ).fetchall()
+
+    return [row.content for row in rows]

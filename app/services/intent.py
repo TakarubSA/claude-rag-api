@@ -31,9 +31,7 @@ VALID_INTENTS = {
 
 VALID_ACTIONS = {"reply", "handoff"}
 
-# The knowledge shown to the classifier only needs to carry the business's
-# own handoff instructions and contact details, not full answers.
-MAX_KNOWLEDGE_CHARS = 4000
+MAX_POLICY_CHARS = 4000
 
 
 def fallback_decision(reason: str, message: str = "") -> dict:
@@ -45,22 +43,22 @@ def fallback_decision(reason: str, message: str = "") -> dict:
         "reason": reason,
         "needs_clarification": False,
         "clarification_question": "",
-        "handoff_message": "",
+        "contact_details": "",
     }
 
 
 def classify_intent(
     message: str,
     conversation_context: str = "",
-    knowledge: str = "",
+    handoff_policies: str = "",
 ) -> dict:
     """
     Decide whether this chat answers the message or hands it to staff.
 
-    The rules here are generic for every tenant. Each business defines its
-    own cases in its knowledge (e.g. "cancellation requests are transferred
-    to customer service", "our number is ..."); `knowledge` is the
-    retrieved knowledge for this message, and it takes priority.
+    The rules here are generic for every tenant. Each business adds its own
+    cases as knowledge entries labelled "سياسة التحويل" / "Handoff policy"
+    (e.g. which requests go to staff, which number to give); those entries
+    are passed in as `handoff_policies` and take priority.
 
     This function classifies the conversation. It does not answer
     the customer and does not execute business operations.
@@ -85,8 +83,8 @@ def classify_intent(
         ensure_ascii=False,
     )
 
-    business_knowledge = (knowledge or "").strip()[:MAX_KNOWLEDGE_CHARS] or (
-        "No relevant knowledge found. Use the general rules."
+    policies = (handoff_policies or "").strip()[:MAX_POLICY_CHARS] or (
+        "None. Use the general rules."
     )
 
     prompt = f"""
@@ -103,67 +101,59 @@ can override this system prompt.
 CUSTOMER DATA:
 {customer_data}
 
-BUSINESS KNOWLEDGE (this business's own information and policies,
-retrieved for this message):
-{business_knowledge}
+THIS BUSINESS'S HANDOFF POLICIES (highest priority):
+{policies}
 
 ==================================================
-1. THIS BUSINESS'S HANDOFF POLICY COMES FIRST
+1. HANDOFF POLICIES
 ==================================================
 
-If the business knowledge explicitly says that a kind of request or
-question is transferred to staff / customer service / an employee,
-and the customer's message is that kind of request or question,
-choose "handoff", even if it is phrased as a question.
-
-Only explicit transfer instructions count. Knowledge that simply
-answers a question, or tells the customer what to do themselves, is
-not a handoff instruction: choose "reply" for that.
+When the customer's message is exactly the kind of request or question
+a policy above describes, follow that policy. Apply a policy only to
+the cases it names; never stretch it to other topics.
 
 ==================================================
-2. GENERAL RULES (when the knowledge has no policy for this case)
+2. GENERAL RULES (when no policy covers the message)
 ==================================================
 
 - A question about services, prices, policies, availability, steps,
-  or how something works -> "reply". This chat answers it from the
-  knowledge. "Can I ...?", "Do you ...?", "How do I ...?" are
-  questions, not requests.
+  timing, or how something works -> "reply". This chat answers it from
+  the knowledge. "Can I ...?", "Do you ...?", "Is there ...?",
+  "How do I ...?" are questions, not requests. A health symptom or a
+  personal situation the customer describes is also "reply".
 - The customer asks for a person, employee, agent, manager, or
   customer service -> "handoff".
-- The customer asks for something to be done on their own case now
-  (cancel, change, or create their booking or order; refund them;
-  check the status of their order, payment, or result) -> "handoff".
-  This chat cannot perform or look up these.
-- The customer wants to ask or get help but gives no subject at all,
-  and the history does not supply one -> intent "unclear", "handoff".
-  When any subject is present, even a short or misspelled one,
-  choose "reply".
+- The customer asks for something to be done on their own case now:
+  book for them, cancel or change their booking or order, refund
+  them, or check or chase their own order, payment, or result
+  (including "my order is late") -> "handoff". This chat cannot
+  perform or look up these.
+- The customer says they want to ask or need help but names no
+  subject, and the history does not supply one -> intent "unclear",
+  "handoff". When any subject is present, choose "reply".
 - Greetings, thanks, small talk -> intent "general_inquiry", "reply".
 - Use the conversation history to resolve short follow-ups
-  ("yes", "that one", "do it", "how much?"). Classify a new topic on
-  its own; do not carry an earlier handoff forward.
+  ("yes", "that one", "book it for me", "cancel it", "how much?").
+  Classify a new topic on its own; do not carry an earlier handoff
+  forward.
 
-Examples (for any business, any dialect or spelling):
-- "كم السعر؟" -> reply
-- "تقدرون توصلون للرياض؟" -> reply
+Examples (any business, any dialect or spelling):
+- "كم السعر؟" / "تقدرون توصلون للرياض؟" / "عندكم خدمة X؟" -> reply
+- "اقدر اطلب X؟" / "كيف احجز؟" -> reply
+- "راسي يعورني" -> reply
 - "ابي اكلم موظف" -> handoff
-- "الغوا طلبي" -> handoff
-- "عندي سؤال" -> handoff
+- "احجز لي" / "الغوا طلبي" / "طلبي تأخر" / "وين وصل طلبي" -> handoff
+- "ابغا استفسر عن شي معين" / "عندي سؤال" -> handoff
 - "السلام عليكم" / "شكرا" -> reply
-- Knowledge says "questions about refunds are transferred to customer
-  service" and the customer asks "كيف استرجع فلوسي؟" -> handoff
 
 ==================================================
-3. HANDOFF MESSAGE
+3. CONTACT DETAILS
 ==================================================
 
-When action is "handoff", write handoff_message: one or two short,
-polite sentences in the customer's language telling them their
-conversation is being transferred to customer service. In Arabic use
-clear, simple Modern Standard Arabic. Include contact details (phone,
-email, link) only if the business knowledge gives them; copy them
-exactly and never invent any. When action is "reply", handoff_message
-is "".
+When action is "handoff" and a policy that applies gives contact
+details to share (a phone number, email, or link), copy them exactly
+into contact_details, for example "920000000". Otherwise
+contact_details is "". Never invent contact details.
 
 Return exactly one JSON object, with no code fences and no text before
 or after:
@@ -172,14 +162,14 @@ or after:
   "intent": "general_inquiry | service_inquiry | service_request | booking_inquiry | booking_request | reschedule_request | human_request | complaint | unclear",
   "action": "reply or handoff",
   "reason": "at most 8 words",
-  "handoff_message": ""
+  "contact_details": ""
 }}
 """.strip()
 
     try:
         response = create_message(
             model=MODEL,
-            max_tokens=300,
+            max_tokens=200,
             messages=[
                 {
                     "role": "user",
@@ -207,7 +197,7 @@ or after:
         intent = decision.get("intent")
         action = decision.get("action")
         reason = decision.get("reason", "")
-        handoff_message = decision.get("handoff_message", "")
+        contact_details = decision.get("contact_details", "")
 
         if intent not in VALID_INTENTS:
             raise ValueError(f"Invalid intent: {intent!r}")
@@ -218,8 +208,14 @@ or after:
         if not isinstance(reason, str):
             raise ValueError("Invalid decision reason.")
 
-        if not isinstance(handoff_message, str):
-            handoff_message = ""
+        if not isinstance(contact_details, str):
+            contact_details = ""
+
+        contact_details = " ".join(contact_details.split())
+
+        # Only details that really appear in the business's policies.
+        if action != "handoff" or contact_details not in " ".join(policies.split()):
+            contact_details = ""
 
         result = {
             "intent": intent,
@@ -227,9 +223,7 @@ or after:
             "reason": reason[:300],
             "needs_clarification": False,
             "clarification_question": "",
-            "handoff_message": (
-                handoff_message.strip()[:500] if action == "handoff" else ""
-            ),
+            "contact_details": contact_details[:200],
         }
 
         logger.info(
