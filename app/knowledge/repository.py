@@ -7,9 +7,8 @@ from app.database.connection import engine
 
 _NORM = str.maketrans("إأآىة", "ااايه")
 
-# Words that express the question/intent rather than the subject being asked about.
-# Removing these from lexical search prevents a query such as "كم سعر مونجارو؟"
-# from matching every knowledge entry that happens to mention a price.
+# Generic question and intent words that should not dominate lexical search.
+# This prevents broad wording from matching unrelated knowledge entries.
 _STOP = {
     "هل", "ما", "ماذا", "كيف", "وين", "اين", "متي", "من", "في", "علي", "عن", "الي",
     "ان", "او", "كم", "هو", "هي", "مع", "لا", "نعم", "عندكم", "عندك", "عندي",
@@ -31,11 +30,7 @@ def _tokens(s: str) -> list[str]:
         if t.startswith("ال") and len(t) > 4:
             t = t[2:]
         if len(t) > 2 and t not in _STOP:
-            # Common Arabic spelling variants for the same product name.
-            if t in {"منجارو", "مونجارو"}:
-                out.extend(["منجارو", "مونجارو"])
-            else:
-                out.append(t)
+            out.append(t)
     # Keep order while removing duplicate tokens.
     return list(dict.fromkeys(out))
 

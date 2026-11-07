@@ -1,0 +1,3002 @@
+[
+  {
+    "id": "V9-001",
+    "category": "reply",
+    "prompt": "كم سعر خدمة تفسير نتائج التحاليل؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-002",
+    "category": "reply",
+    "prompt": "لو سمحت، كم سعر خدمة تفسير نتائج التحاليل؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-003",
+    "category": "reply",
+    "prompt": "كم سعر خدمة تفسير نتائج التحاليل؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-004",
+    "category": "reply",
+    "prompt": "من فضلك، كم سعر خدمة تفسير نتائج التحاليل؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-005",
+    "category": "reply",
+    "prompt": "كم سعر خدمة تفسير نتائج التحاليل؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-006",
+    "category": "reply",
+    "prompt": "كم رسوم الاستشارة العاجلة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-007",
+    "category": "reply",
+    "prompt": "لو سمحت، كم رسوم الاستشارة العاجلة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-008",
+    "category": "reply",
+    "prompt": "كم رسوم الاستشارة العاجلة؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-009",
+    "category": "reply",
+    "prompt": "من فضلك، كم رسوم الاستشارة العاجلة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-010",
+    "category": "reply",
+    "prompt": "كم رسوم الاستشارة العاجلة؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-011",
+    "category": "reply",
+    "prompt": "أين أجد أسعار التحاليل؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-012",
+    "category": "reply",
+    "prompt": "لو سمحت، أين أجد أسعار التحاليل؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-013",
+    "category": "reply",
+    "prompt": "أين أجد أسعار التحاليل؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-014",
+    "category": "reply",
+    "prompt": "من فضلك، أين أجد أسعار التحاليل؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-015",
+    "category": "reply",
+    "prompt": "أين أجد أسعار التحاليل؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-016",
+    "category": "reply",
+    "prompt": "هل تفسير نتائج دلتا برسوم؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-017",
+    "category": "reply",
+    "prompt": "لو سمحت، هل تفسير نتائج دلتا برسوم؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-018",
+    "category": "reply",
+    "prompt": "هل تفسير نتائج دلتا برسوم؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-019",
+    "category": "reply",
+    "prompt": "من فضلك، هل تفسير نتائج دلتا برسوم؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-020",
+    "category": "reply",
+    "prompt": "هل تفسير نتائج دلتا برسوم؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-021",
+    "category": "reply",
+    "prompt": "هل حكيم لاب يقدم تفسير النتائج بدون رسوم إضافية؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-022",
+    "category": "reply",
+    "prompt": "لو سمحت، هل حكيم لاب يقدم تفسير النتائج بدون رسوم إضافية؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-023",
+    "category": "reply",
+    "prompt": "هل حكيم لاب يقدم تفسير النتائج بدون رسوم إضافية؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-024",
+    "category": "reply",
+    "prompt": "من فضلك، هل حكيم لاب يقدم تفسير النتائج بدون رسوم إضافية؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-025",
+    "category": "reply",
+    "prompt": "هل حكيم لاب يقدم تفسير النتائج بدون رسوم إضافية؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-026",
+    "category": "reply",
+    "prompt": "ما الخدمات التي تقدمها حكيم كير؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-027",
+    "category": "reply",
+    "prompt": "لو سمحت، ما الخدمات التي تقدمها حكيم كير؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-028",
+    "category": "reply",
+    "prompt": "ما الخدمات التي تقدمها حكيم كير؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-029",
+    "category": "reply",
+    "prompt": "من فضلك، ما الخدمات التي تقدمها حكيم كير؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-030",
+    "category": "reply",
+    "prompt": "ما الخدمات التي تقدمها حكيم كير؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-031",
+    "category": "reply",
+    "prompt": "كيف أستخدم تطبيق حكيم كير؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-032",
+    "category": "reply",
+    "prompt": "لو سمحت، كيف أستخدم تطبيق حكيم كير؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-033",
+    "category": "reply",
+    "prompt": "كيف أستخدم تطبيق حكيم كير؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-034",
+    "category": "reply",
+    "prompt": "من فضلك، كيف أستخدم تطبيق حكيم كير؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-035",
+    "category": "reply",
+    "prompt": "كيف أستخدم تطبيق حكيم كير؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-036",
+    "category": "reply",
+    "prompt": "ما الفرق بين تفسير التحاليل والاستشارة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-037",
+    "category": "reply",
+    "prompt": "لو سمحت، ما الفرق بين تفسير التحاليل والاستشارة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-038",
+    "category": "reply",
+    "prompt": "ما الفرق بين تفسير التحاليل والاستشارة؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-039",
+    "category": "reply",
+    "prompt": "من فضلك، ما الفرق بين تفسير التحاليل والاستشارة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-040",
+    "category": "reply",
+    "prompt": "ما الفرق بين تفسير التحاليل والاستشارة؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-041",
+    "category": "reply",
+    "prompt": "هل يمكن إرسال تقرير PDF؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-042",
+    "category": "reply",
+    "prompt": "لو سمحت، هل يمكن إرسال تقرير PDF؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-043",
+    "category": "reply",
+    "prompt": "هل يمكن إرسال تقرير PDF؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-044",
+    "category": "reply",
+    "prompt": "من فضلك، هل يمكن إرسال تقرير PDF؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-045",
+    "category": "reply",
+    "prompt": "هل يمكن إرسال تقرير PDF؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-046",
+    "category": "reply",
+    "prompt": "كم تستغرق مدة استرداد المبلغ؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-047",
+    "category": "reply",
+    "prompt": "لو سمحت، كم تستغرق مدة استرداد المبلغ؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-048",
+    "category": "reply",
+    "prompt": "كم تستغرق مدة استرداد المبلغ؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-049",
+    "category": "reply",
+    "prompt": "من فضلك، كم تستغرق مدة استرداد المبلغ؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-050",
+    "category": "reply",
+    "prompt": "كم تستغرق مدة استرداد المبلغ؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-051",
+    "category": "reply",
+    "prompt": "هل يرجع المبلغ خلال يوم عمل؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-052",
+    "category": "reply",
+    "prompt": "لو سمحت، هل يرجع المبلغ خلال يوم عمل؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-053",
+    "category": "reply",
+    "prompt": "هل يرجع المبلغ خلال يوم عمل؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-054",
+    "category": "reply",
+    "prompt": "من فضلك، هل يرجع المبلغ خلال يوم عمل؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-055",
+    "category": "reply",
+    "prompt": "هل يرجع المبلغ خلال يوم عمل؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-056",
+    "category": "reply",
+    "prompt": "ما سياسة استرداد المبالغ؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-057",
+    "category": "reply",
+    "prompt": "لو سمحت، ما سياسة استرداد المبالغ؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-058",
+    "category": "reply",
+    "prompt": "ما سياسة استرداد المبالغ؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-059",
+    "category": "reply",
+    "prompt": "من فضلك، ما سياسة استرداد المبالغ؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-060",
+    "category": "reply",
+    "prompt": "ما سياسة استرداد المبالغ؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-061",
+    "category": "reply",
+    "prompt": "هل يمكن استرداد المبلغ إلى البطاقة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-062",
+    "category": "reply",
+    "prompt": "لو سمحت، هل يمكن استرداد المبلغ إلى البطاقة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-063",
+    "category": "reply",
+    "prompt": "هل يمكن استرداد المبلغ إلى البطاقة؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-064",
+    "category": "reply",
+    "prompt": "من فضلك، هل يمكن استرداد المبلغ إلى البطاقة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-065",
+    "category": "reply",
+    "prompt": "هل يمكن استرداد المبلغ إلى البطاقة؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-066",
+    "category": "reply",
+    "prompt": "هل تختلف رسوم الاسترداد حسب طريقة الدفع؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-067",
+    "category": "reply",
+    "prompt": "لو سمحت، هل تختلف رسوم الاسترداد حسب طريقة الدفع؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-068",
+    "category": "reply",
+    "prompt": "هل تختلف رسوم الاسترداد حسب طريقة الدفع؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-069",
+    "category": "reply",
+    "prompt": "من فضلك، هل تختلف رسوم الاسترداد حسب طريقة الدفع؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-070",
+    "category": "reply",
+    "prompt": "هل تختلف رسوم الاسترداد حسب طريقة الدفع؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-071",
+    "category": "reply",
+    "prompt": "كيف أعرف حالة طلبي؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-072",
+    "category": "reply",
+    "prompt": "لو سمحت، كيف أعرف حالة طلبي؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-073",
+    "category": "reply",
+    "prompt": "كيف أعرف حالة طلبي؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-074",
+    "category": "reply",
+    "prompt": "من فضلك، كيف أعرف حالة طلبي؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-075",
+    "category": "reply",
+    "prompt": "كيف أعرف حالة طلبي؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-076",
+    "category": "reply",
+    "prompt": "ما المختبرات المتعاونة مع حكيم كير؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-077",
+    "category": "reply",
+    "prompt": "لو سمحت، ما المختبرات المتعاونة مع حكيم كير؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-078",
+    "category": "reply",
+    "prompt": "ما المختبرات المتعاونة مع حكيم كير؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-079",
+    "category": "reply",
+    "prompt": "من فضلك، ما المختبرات المتعاونة مع حكيم كير؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-080",
+    "category": "reply",
+    "prompt": "ما المختبرات المتعاونة مع حكيم كير؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-081",
+    "category": "reply",
+    "prompt": "هل حكيم كير مختبر طبي؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-082",
+    "category": "reply",
+    "prompt": "لو سمحت، هل حكيم كير مختبر طبي؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-083",
+    "category": "reply",
+    "prompt": "هل حكيم كير مختبر طبي؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-084",
+    "category": "reply",
+    "prompt": "من فضلك، هل حكيم كير مختبر طبي؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-085",
+    "category": "reply",
+    "prompt": "هل حكيم كير مختبر طبي؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-086",
+    "category": "reply",
+    "prompt": "هل يمكن تفسير نتائج مختبر غير متعاون؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-087",
+    "category": "reply",
+    "prompt": "لو سمحت، هل يمكن تفسير نتائج مختبر غير متعاون؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-088",
+    "category": "reply",
+    "prompt": "هل يمكن تفسير نتائج مختبر غير متعاون؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-089",
+    "category": "reply",
+    "prompt": "من فضلك، هل يمكن تفسير نتائج مختبر غير متعاون؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-090",
+    "category": "reply",
+    "prompt": "هل يمكن تفسير نتائج مختبر غير متعاون؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-091",
+    "category": "reply",
+    "prompt": "كيف أرسل نتيجة التحليل؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-092",
+    "category": "reply",
+    "prompt": "لو سمحت، كيف أرسل نتيجة التحليل؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-093",
+    "category": "reply",
+    "prompt": "كيف أرسل نتيجة التحليل؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-094",
+    "category": "reply",
+    "prompt": "من فضلك، كيف أرسل نتيجة التحليل؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-095",
+    "category": "reply",
+    "prompt": "كيف أرسل نتيجة التحليل؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-096",
+    "category": "reply",
+    "prompt": "ما البيانات المطلوبة لتفسير النتائج؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-097",
+    "category": "reply",
+    "prompt": "لو سمحت، ما البيانات المطلوبة لتفسير النتائج؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-098",
+    "category": "reply",
+    "prompt": "ما البيانات المطلوبة لتفسير النتائج؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-099",
+    "category": "reply",
+    "prompt": "من فضلك، ما البيانات المطلوبة لتفسير النتائج؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-100",
+    "category": "reply",
+    "prompt": "ما البيانات المطلوبة لتفسير النتائج؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-101",
+    "category": "reply",
+    "prompt": "هل يمكن تفسير أكثر من تحليل؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-102",
+    "category": "reply",
+    "prompt": "لو سمحت، هل يمكن تفسير أكثر من تحليل؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-103",
+    "category": "reply",
+    "prompt": "هل يمكن تفسير أكثر من تحليل؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-104",
+    "category": "reply",
+    "prompt": "من فضلك، هل يمكن تفسير أكثر من تحليل؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-105",
+    "category": "reply",
+    "prompt": "هل يمكن تفسير أكثر من تحليل؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-106",
+    "category": "reply",
+    "prompt": "هل يمكن إرسال نتيجة قديمة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-107",
+    "category": "reply",
+    "prompt": "لو سمحت، هل يمكن إرسال نتيجة قديمة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-108",
+    "category": "reply",
+    "prompt": "هل يمكن إرسال نتيجة قديمة؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-109",
+    "category": "reply",
+    "prompt": "من فضلك، هل يمكن إرسال نتيجة قديمة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-110",
+    "category": "reply",
+    "prompt": "هل يمكن إرسال نتيجة قديمة؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-111",
+    "category": "reply",
+    "prompt": "كيف أحصل على استشارة طبية؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-112",
+    "category": "reply",
+    "prompt": "لو سمحت، كيف أحصل على استشارة طبية؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-113",
+    "category": "reply",
+    "prompt": "كيف أحصل على استشارة طبية؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-114",
+    "category": "reply",
+    "prompt": "من فضلك، كيف أحصل على استشارة طبية؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-115",
+    "category": "reply",
+    "prompt": "كيف أحصل على استشارة طبية؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-116",
+    "category": "reply",
+    "prompt": "ما الفرق بين الاستشارة العادية والعاجلة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-117",
+    "category": "reply",
+    "prompt": "لو سمحت، ما الفرق بين الاستشارة العادية والعاجلة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-118",
+    "category": "reply",
+    "prompt": "ما الفرق بين الاستشارة العادية والعاجلة؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-119",
+    "category": "reply",
+    "prompt": "من فضلك، ما الفرق بين الاستشارة العادية والعاجلة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-120",
+    "category": "reply",
+    "prompt": "ما الفرق بين الاستشارة العادية والعاجلة؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-121",
+    "category": "reply",
+    "prompt": "هل خدمة تفسير النتائج متاحة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-122",
+    "category": "reply",
+    "prompt": "لو سمحت، هل خدمة تفسير النتائج متاحة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-123",
+    "category": "reply",
+    "prompt": "هل خدمة تفسير النتائج متاحة؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-124",
+    "category": "reply",
+    "prompt": "من فضلك، هل خدمة تفسير النتائج متاحة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-125",
+    "category": "reply",
+    "prompt": "هل خدمة تفسير النتائج متاحة؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-126",
+    "category": "reply",
+    "prompt": "أريد معرفة أسعار الباقات.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-127",
+    "category": "reply",
+    "prompt": "لو سمحت، أريد معرفة أسعار الباقات.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-128",
+    "category": "reply",
+    "prompt": "أريد معرفة أسعار الباقات. ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-129",
+    "category": "reply",
+    "prompt": "من فضلك، أريد معرفة أسعار الباقات.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-130",
+    "category": "reply",
+    "prompt": "أريد معرفة أسعار الباقات. أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-131",
+    "category": "reply",
+    "prompt": "هل الأسعار موجودة في التطبيق؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-132",
+    "category": "reply",
+    "prompt": "لو سمحت، هل الأسعار موجودة في التطبيق؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-133",
+    "category": "reply",
+    "prompt": "هل الأسعار موجودة في التطبيق؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-134",
+    "category": "reply",
+    "prompt": "من فضلك، هل الأسعار موجودة في التطبيق؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-135",
+    "category": "reply",
+    "prompt": "هل الأسعار موجودة في التطبيق؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-136",
+    "category": "reply",
+    "prompt": "كيف أطلع على أسعار التحاليل؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-137",
+    "category": "reply",
+    "prompt": "لو سمحت، كيف أطلع على أسعار التحاليل؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-138",
+    "category": "reply",
+    "prompt": "كيف أطلع على أسعار التحاليل؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-139",
+    "category": "reply",
+    "prompt": "من فضلك، كيف أطلع على أسعار التحاليل؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-140",
+    "category": "reply",
+    "prompt": "كيف أطلع على أسعار التحاليل؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-141",
+    "category": "reply",
+    "prompt": "هل رسوم تفسير التحاليل ثابتة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-142",
+    "category": "reply",
+    "prompt": "لو سمحت، هل رسوم تفسير التحاليل ثابتة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-143",
+    "category": "reply",
+    "prompt": "هل رسوم تفسير التحاليل ثابتة؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-144",
+    "category": "reply",
+    "prompt": "من فضلك، هل رسوم تفسير التحاليل ثابتة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-145",
+    "category": "reply",
+    "prompt": "هل رسوم تفسير التحاليل ثابتة؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-146",
+    "category": "reply",
+    "prompt": "كم سعر قراءة نتائج مختبرات دلتا؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-147",
+    "category": "reply",
+    "prompt": "لو سمحت، كم سعر قراءة نتائج مختبرات دلتا؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-148",
+    "category": "reply",
+    "prompt": "كم سعر قراءة نتائج مختبرات دلتا؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-149",
+    "category": "reply",
+    "prompt": "من فضلك، كم سعر قراءة نتائج مختبرات دلتا؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-150",
+    "category": "reply",
+    "prompt": "كم سعر قراءة نتائج مختبرات دلتا؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-151",
+    "category": "reply",
+    "prompt": "هل يوجد رسوم إضافية على نتائج حكيم لاب؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-152",
+    "category": "reply",
+    "prompt": "لو سمحت، هل يوجد رسوم إضافية على نتائج حكيم لاب؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-153",
+    "category": "reply",
+    "prompt": "هل يوجد رسوم إضافية على نتائج حكيم لاب؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-154",
+    "category": "reply",
+    "prompt": "من فضلك، هل يوجد رسوم إضافية على نتائج حكيم لاب؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-155",
+    "category": "reply",
+    "prompt": "هل يوجد رسوم إضافية على نتائج حكيم لاب؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-156",
+    "category": "reply",
+    "prompt": "ما طريقة التواصل مع خدمة العملاء؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-157",
+    "category": "reply",
+    "prompt": "لو سمحت، ما طريقة التواصل مع خدمة العملاء؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-158",
+    "category": "reply",
+    "prompt": "ما طريقة التواصل مع خدمة العملاء؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-159",
+    "category": "reply",
+    "prompt": "من فضلك، ما طريقة التواصل مع خدمة العملاء؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-160",
+    "category": "reply",
+    "prompt": "ما طريقة التواصل مع خدمة العملاء؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-161",
+    "category": "reply",
+    "prompt": "كيف أستفيد من خدمات المنصة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-162",
+    "category": "reply",
+    "prompt": "لو سمحت، كيف أستفيد من خدمات المنصة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-163",
+    "category": "reply",
+    "prompt": "كيف أستفيد من خدمات المنصة؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-164",
+    "category": "reply",
+    "prompt": "من فضلك، كيف أستفيد من خدمات المنصة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-165",
+    "category": "reply",
+    "prompt": "كيف أستفيد من خدمات المنصة؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-166",
+    "category": "reply",
+    "prompt": "هل تقبلون تقارير المستشفيات؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-167",
+    "category": "reply",
+    "prompt": "لو سمحت، هل تقبلون تقارير المستشفيات؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-168",
+    "category": "reply",
+    "prompt": "هل تقبلون تقارير المستشفيات؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-169",
+    "category": "reply",
+    "prompt": "من فضلك، هل تقبلون تقارير المستشفيات؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-170",
+    "category": "reply",
+    "prompt": "هل تقبلون تقارير المستشفيات؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-171",
+    "category": "reply",
+    "prompt": "ما صيغة التقرير المقبولة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-172",
+    "category": "reply",
+    "prompt": "لو سمحت، ما صيغة التقرير المقبولة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-173",
+    "category": "reply",
+    "prompt": "ما صيغة التقرير المقبولة؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-174",
+    "category": "reply",
+    "prompt": "من فضلك، ما صيغة التقرير المقبولة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-175",
+    "category": "reply",
+    "prompt": "ما صيغة التقرير المقبولة؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-176",
+    "category": "reply",
+    "prompt": "هل يمكن تفسير نتيجة تحليل الدم؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-177",
+    "category": "reply",
+    "prompt": "لو سمحت، هل يمكن تفسير نتيجة تحليل الدم؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-178",
+    "category": "reply",
+    "prompt": "هل يمكن تفسير نتيجة تحليل الدم؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-179",
+    "category": "reply",
+    "prompt": "من فضلك، هل يمكن تفسير نتيجة تحليل الدم؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-180",
+    "category": "reply",
+    "prompt": "هل يمكن تفسير نتيجة تحليل الدم؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-181",
+    "category": "reply",
+    "prompt": "ما حدود خدمة تفسير التحاليل؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-182",
+    "category": "reply",
+    "prompt": "لو سمحت، ما حدود خدمة تفسير التحاليل؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-183",
+    "category": "reply",
+    "prompt": "ما حدود خدمة تفسير التحاليل؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-184",
+    "category": "reply",
+    "prompt": "من فضلك، ما حدود خدمة تفسير التحاليل؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-185",
+    "category": "reply",
+    "prompt": "ما حدود خدمة تفسير التحاليل؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-186",
+    "category": "reply",
+    "prompt": "هل تفسير التحليل يغني عن زيارة الطبيب؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-187",
+    "category": "reply",
+    "prompt": "لو سمحت، هل تفسير التحليل يغني عن زيارة الطبيب؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-188",
+    "category": "reply",
+    "prompt": "هل تفسير التحليل يغني عن زيارة الطبيب؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-189",
+    "category": "reply",
+    "prompt": "من فضلك، هل تفسير التحليل يغني عن زيارة الطبيب؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-190",
+    "category": "reply",
+    "prompt": "هل تفسير التحليل يغني عن زيارة الطبيب؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-191",
+    "category": "reply",
+    "prompt": "هل يمكنني حجز استشارة من التطبيق؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-192",
+    "category": "reply",
+    "prompt": "لو سمحت، هل يمكنني حجز استشارة من التطبيق؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-193",
+    "category": "reply",
+    "prompt": "هل يمكنني حجز استشارة من التطبيق؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-194",
+    "category": "reply",
+    "prompt": "من فضلك، هل يمكنني حجز استشارة من التطبيق؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-195",
+    "category": "reply",
+    "prompt": "هل يمكنني حجز استشارة من التطبيق؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-196",
+    "category": "reply",
+    "prompt": "كيف أطلب خدمة جديدة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-197",
+    "category": "reply",
+    "prompt": "لو سمحت، كيف أطلب خدمة جديدة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-198",
+    "category": "reply",
+    "prompt": "كيف أطلب خدمة جديدة؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-199",
+    "category": "reply",
+    "prompt": "من فضلك، كيف أطلب خدمة جديدة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-200",
+    "category": "reply",
+    "prompt": "كيف أطلب خدمة جديدة؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-201",
+    "category": "reply",
+    "prompt": "هل توجد زيارة منزلية لسحب الدم؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-202",
+    "category": "reply",
+    "prompt": "لو سمحت، هل توجد زيارة منزلية لسحب الدم؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-203",
+    "category": "reply",
+    "prompt": "هل توجد زيارة منزلية لسحب الدم؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-204",
+    "category": "reply",
+    "prompt": "من فضلك، هل توجد زيارة منزلية لسحب الدم؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-205",
+    "category": "reply",
+    "prompt": "هل توجد زيارة منزلية لسحب الدم؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-206",
+    "category": "reply",
+    "prompt": "كم رسوم زيارة الممرضة المنزلية؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-207",
+    "category": "reply",
+    "prompt": "لو سمحت، كم رسوم زيارة الممرضة المنزلية؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-208",
+    "category": "reply",
+    "prompt": "كم رسوم زيارة الممرضة المنزلية؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-209",
+    "category": "reply",
+    "prompt": "من فضلك، كم رسوم زيارة الممرضة المنزلية؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-210",
+    "category": "reply",
+    "prompt": "كم رسوم زيارة الممرضة المنزلية؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-211",
+    "category": "reply",
+    "prompt": "هل يمكن الاطلاع على تفاصيل الحجز؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-212",
+    "category": "reply",
+    "prompt": "لو سمحت، هل يمكن الاطلاع على تفاصيل الحجز؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-213",
+    "category": "reply",
+    "prompt": "هل يمكن الاطلاع على تفاصيل الحجز؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-214",
+    "category": "reply",
+    "prompt": "من فضلك، هل يمكن الاطلاع على تفاصيل الحجز؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-215",
+    "category": "reply",
+    "prompt": "هل يمكن الاطلاع على تفاصيل الحجز؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-216",
+    "category": "reply",
+    "prompt": "ما طرق الدفع المتاحة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-217",
+    "category": "reply",
+    "prompt": "لو سمحت، ما طرق الدفع المتاحة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-218",
+    "category": "reply",
+    "prompt": "ما طرق الدفع المتاحة؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-219",
+    "category": "reply",
+    "prompt": "من فضلك، ما طرق الدفع المتاحة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-220",
+    "category": "reply",
+    "prompt": "ما طرق الدفع المتاحة؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-221",
+    "category": "reply",
+    "prompt": "هل تقبلون تابي وتمارا؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-222",
+    "category": "reply",
+    "prompt": "لو سمحت، هل تقبلون تابي وتمارا؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-223",
+    "category": "reply",
+    "prompt": "هل تقبلون تابي وتمارا؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-224",
+    "category": "reply",
+    "prompt": "من فضلك، هل تقبلون تابي وتمارا؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-225",
+    "category": "reply",
+    "prompt": "هل تقبلون تابي وتمارا؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-226",
+    "category": "reply",
+    "prompt": "هل يمكن الدفع بالبطاقة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-227",
+    "category": "reply",
+    "prompt": "لو سمحت، هل يمكن الدفع بالبطاقة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-228",
+    "category": "reply",
+    "prompt": "هل يمكن الدفع بالبطاقة؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-229",
+    "category": "reply",
+    "prompt": "من فضلك، هل يمكن الدفع بالبطاقة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-230",
+    "category": "reply",
+    "prompt": "هل يمكن الدفع بالبطاقة؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-231",
+    "category": "reply",
+    "prompt": "كيف أتابع طلب الاسترداد؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-232",
+    "category": "reply",
+    "prompt": "لو سمحت، كيف أتابع طلب الاسترداد؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-233",
+    "category": "reply",
+    "prompt": "كيف أتابع طلب الاسترداد؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-234",
+    "category": "reply",
+    "prompt": "من فضلك، كيف أتابع طلب الاسترداد؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-235",
+    "category": "reply",
+    "prompt": "كيف أتابع طلب الاسترداد؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-236",
+    "category": "reply",
+    "prompt": "هل يمكن إلغاء الاستشارة العاجلة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-237",
+    "category": "reply",
+    "prompt": "لو سمحت، هل يمكن إلغاء الاستشارة العاجلة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-238",
+    "category": "reply",
+    "prompt": "هل يمكن إلغاء الاستشارة العاجلة؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-239",
+    "category": "reply",
+    "prompt": "من فضلك، هل يمكن إلغاء الاستشارة العاجلة؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-240",
+    "category": "reply",
+    "prompt": "هل يمكن إلغاء الاستشارة العاجلة؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-241",
+    "category": "reply",
+    "prompt": "ما شروط إلغاء الموعد العادي؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-242",
+    "category": "reply",
+    "prompt": "لو سمحت، ما شروط إلغاء الموعد العادي؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-243",
+    "category": "reply",
+    "prompt": "ما شروط إلغاء الموعد العادي؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-244",
+    "category": "reply",
+    "prompt": "من فضلك، ما شروط إلغاء الموعد العادي؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-245",
+    "category": "reply",
+    "prompt": "ما شروط إلغاء الموعد العادي؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-246",
+    "category": "reply",
+    "prompt": "هل بياناتي الطبية محفوظة بسرية؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-247",
+    "category": "reply",
+    "prompt": "لو سمحت، هل بياناتي الطبية محفوظة بسرية؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-248",
+    "category": "reply",
+    "prompt": "هل بياناتي الطبية محفوظة بسرية؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-249",
+    "category": "reply",
+    "prompt": "من فضلك، هل بياناتي الطبية محفوظة بسرية؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-250",
+    "category": "reply",
+    "prompt": "هل بياناتي الطبية محفوظة بسرية؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-251",
+    "category": "handoff",
+    "prompt": "أريد تغيير موعد الاستشارة أونلاين.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-252",
+    "category": "handoff",
+    "prompt": "لو سمحت، أريد تغيير موعد الاستشارة أونلاين.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-253",
+    "category": "handoff",
+    "prompt": "أريد تغيير موعد الاستشارة أونلاين. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-254",
+    "category": "handoff",
+    "prompt": "من فضلك، أريد تغيير موعد الاستشارة أونلاين.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-255",
+    "category": "handoff",
+    "prompt": "أريد تغيير موعد الاستشارة أونلاين. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-256",
+    "category": "handoff",
+    "prompt": "أحتاج تعديل موعد استشارتي.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-257",
+    "category": "handoff",
+    "prompt": "لو سمحت، أحتاج تعديل موعد استشارتي.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-258",
+    "category": "handoff",
+    "prompt": "أحتاج تعديل موعد استشارتي. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-259",
+    "category": "handoff",
+    "prompt": "من فضلك، أحتاج تعديل موعد استشارتي.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-260",
+    "category": "handoff",
+    "prompt": "أحتاج تعديل موعد استشارتي. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-261",
+    "category": "handoff",
+    "prompt": "أريد نقل الاستشارة إلى يوم آخر.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-262",
+    "category": "handoff",
+    "prompt": "لو سمحت، أريد نقل الاستشارة إلى يوم آخر.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-263",
+    "category": "handoff",
+    "prompt": "أريد نقل الاستشارة إلى يوم آخر. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-264",
+    "category": "handoff",
+    "prompt": "من فضلك، أريد نقل الاستشارة إلى يوم آخر.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-265",
+    "category": "handoff",
+    "prompt": "أريد نقل الاستشارة إلى يوم آخر. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-266",
+    "category": "handoff",
+    "prompt": "موعد الاستشارة لا يناسبني وأريد تغييره.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-267",
+    "category": "handoff",
+    "prompt": "لو سمحت، موعد الاستشارة لا يناسبني وأريد تغييره.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-268",
+    "category": "handoff",
+    "prompt": "موعد الاستشارة لا يناسبني وأريد تغييره. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-269",
+    "category": "handoff",
+    "prompt": "من فضلك، موعد الاستشارة لا يناسبني وأريد تغييره.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-270",
+    "category": "handoff",
+    "prompt": "موعد الاستشارة لا يناسبني وأريد تغييره. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-271",
+    "category": "handoff",
+    "prompt": "أبغى أقدم موعد الاستشارة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-272",
+    "category": "handoff",
+    "prompt": "لو سمحت، أبغى أقدم موعد الاستشارة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-273",
+    "category": "handoff",
+    "prompt": "أبغى أقدم موعد الاستشارة. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-274",
+    "category": "handoff",
+    "prompt": "من فضلك، أبغى أقدم موعد الاستشارة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-275",
+    "category": "handoff",
+    "prompt": "أبغى أقدم موعد الاستشارة. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-276",
+    "category": "handoff",
+    "prompt": "أبغى أأخر موعد الاستشارة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-277",
+    "category": "handoff",
+    "prompt": "لو سمحت، أبغى أأخر موعد الاستشارة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-278",
+    "category": "handoff",
+    "prompt": "أبغى أأخر موعد الاستشارة. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-279",
+    "category": "handoff",
+    "prompt": "من فضلك، أبغى أأخر موعد الاستشارة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-280",
+    "category": "handoff",
+    "prompt": "أبغى أأخر موعد الاستشارة. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-281",
+    "category": "handoff",
+    "prompt": "أريد إعادة جدولة الاستشارة الطبية.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-282",
+    "category": "handoff",
+    "prompt": "لو سمحت، أريد إعادة جدولة الاستشارة الطبية.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-283",
+    "category": "handoff",
+    "prompt": "أريد إعادة جدولة الاستشارة الطبية. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-284",
+    "category": "handoff",
+    "prompt": "من فضلك، أريد إعادة جدولة الاستشارة الطبية.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-285",
+    "category": "handoff",
+    "prompt": "أريد إعادة جدولة الاستشارة الطبية. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-286",
+    "category": "handoff",
+    "prompt": "ممكن تغيرون لي موعد الاستشارة؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-287",
+    "category": "handoff",
+    "prompt": "لو سمحت، ممكن تغيرون لي موعد الاستشارة؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-288",
+    "category": "handoff",
+    "prompt": "ممكن تغيرون لي موعد الاستشارة؟ ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-289",
+    "category": "handoff",
+    "prompt": "من فضلك، ممكن تغيرون لي موعد الاستشارة؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-290",
+    "category": "handoff",
+    "prompt": "ممكن تغيرون لي موعد الاستشارة؟ أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-291",
+    "category": "handoff",
+    "prompt": "أريد تعديل تاريخ الاستشارة المحجوزة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-292",
+    "category": "handoff",
+    "prompt": "لو سمحت، أريد تعديل تاريخ الاستشارة المحجوزة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-293",
+    "category": "handoff",
+    "prompt": "أريد تعديل تاريخ الاستشارة المحجوزة. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-294",
+    "category": "handoff",
+    "prompt": "من فضلك، أريد تعديل تاريخ الاستشارة المحجوزة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-295",
+    "category": "handoff",
+    "prompt": "أريد تعديل تاريخ الاستشارة المحجوزة. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-296",
+    "category": "handoff",
+    "prompt": "هل يمكن نقل موعد استشارتي؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-297",
+    "category": "handoff",
+    "prompt": "لو سمحت، هل يمكن نقل موعد استشارتي؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-298",
+    "category": "handoff",
+    "prompt": "هل يمكن نقل موعد استشارتي؟ ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-299",
+    "category": "handoff",
+    "prompt": "من فضلك، هل يمكن نقل موعد استشارتي؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-300",
+    "category": "handoff",
+    "prompt": "هل يمكن نقل موعد استشارتي؟ أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-301",
+    "category": "handoff",
+    "prompt": "أريد تغيير موعد زيارة الممرضة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-302",
+    "category": "handoff",
+    "prompt": "لو سمحت، أريد تغيير موعد زيارة الممرضة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-303",
+    "category": "handoff",
+    "prompt": "أريد تغيير موعد زيارة الممرضة. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-304",
+    "category": "handoff",
+    "prompt": "من فضلك، أريد تغيير موعد زيارة الممرضة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-305",
+    "category": "handoff",
+    "prompt": "أريد تغيير موعد زيارة الممرضة. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-306",
+    "category": "handoff",
+    "prompt": "أحتاج تعديل موعد سحب الدم المنزلي.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-307",
+    "category": "handoff",
+    "prompt": "لو سمحت، أحتاج تعديل موعد سحب الدم المنزلي.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-308",
+    "category": "handoff",
+    "prompt": "أحتاج تعديل موعد سحب الدم المنزلي. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-309",
+    "category": "handoff",
+    "prompt": "من فضلك، أحتاج تعديل موعد سحب الدم المنزلي.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-310",
+    "category": "handoff",
+    "prompt": "أحتاج تعديل موعد سحب الدم المنزلي. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-311",
+    "category": "handoff",
+    "prompt": "موعد الزيارة المنزلية لا يناسبني.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-312",
+    "category": "handoff",
+    "prompt": "لو سمحت، موعد الزيارة المنزلية لا يناسبني.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-313",
+    "category": "handoff",
+    "prompt": "موعد الزيارة المنزلية لا يناسبني. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-314",
+    "category": "handoff",
+    "prompt": "من فضلك، موعد الزيارة المنزلية لا يناسبني.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-315",
+    "category": "handoff",
+    "prompt": "موعد الزيارة المنزلية لا يناسبني. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-316",
+    "category": "handoff",
+    "prompt": "أريد نقل موعد سحب العينة إلى يوم آخر.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-317",
+    "category": "handoff",
+    "prompt": "لو سمحت، أريد نقل موعد سحب العينة إلى يوم آخر.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-318",
+    "category": "handoff",
+    "prompt": "أريد نقل موعد سحب العينة إلى يوم آخر. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-319",
+    "category": "handoff",
+    "prompt": "من فضلك، أريد نقل موعد سحب العينة إلى يوم آخر.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-320",
+    "category": "handoff",
+    "prompt": "أريد نقل موعد سحب العينة إلى يوم آخر. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-321",
+    "category": "handoff",
+    "prompt": "أريد إعادة جدولة زيارة الممرضة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-322",
+    "category": "handoff",
+    "prompt": "لو سمحت، أريد إعادة جدولة زيارة الممرضة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-323",
+    "category": "handoff",
+    "prompt": "أريد إعادة جدولة زيارة الممرضة. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-324",
+    "category": "handoff",
+    "prompt": "من فضلك، أريد إعادة جدولة زيارة الممرضة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-325",
+    "category": "handoff",
+    "prompt": "أريد إعادة جدولة زيارة الممرضة. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-326",
+    "category": "handoff",
+    "prompt": "أبغى أغير وقت الزيارة المنزلية.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-327",
+    "category": "handoff",
+    "prompt": "لو سمحت، أبغى أغير وقت الزيارة المنزلية.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-328",
+    "category": "handoff",
+    "prompt": "أبغى أغير وقت الزيارة المنزلية. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-329",
+    "category": "handoff",
+    "prompt": "من فضلك، أبغى أغير وقت الزيارة المنزلية.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-330",
+    "category": "handoff",
+    "prompt": "أبغى أغير وقت الزيارة المنزلية. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-331",
+    "category": "handoff",
+    "prompt": "أحتاج موعدًا جديدًا لسحب الدم بالمنزل.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-332",
+    "category": "handoff",
+    "prompt": "لو سمحت، أحتاج موعدًا جديدًا لسحب الدم بالمنزل.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-333",
+    "category": "handoff",
+    "prompt": "أحتاج موعدًا جديدًا لسحب الدم بالمنزل. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-334",
+    "category": "handoff",
+    "prompt": "من فضلك، أحتاج موعدًا جديدًا لسحب الدم بالمنزل.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-335",
+    "category": "handoff",
+    "prompt": "أحتاج موعدًا جديدًا لسحب الدم بالمنزل. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-336",
+    "category": "handoff",
+    "prompt": "ممكن تعدلون موعد زيارة التمريض؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-337",
+    "category": "handoff",
+    "prompt": "لو سمحت، ممكن تعدلون موعد زيارة التمريض؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-338",
+    "category": "handoff",
+    "prompt": "ممكن تعدلون موعد زيارة التمريض؟ ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-339",
+    "category": "handoff",
+    "prompt": "من فضلك، ممكن تعدلون موعد زيارة التمريض؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-340",
+    "category": "handoff",
+    "prompt": "ممكن تعدلون موعد زيارة التمريض؟ أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-341",
+    "category": "handoff",
+    "prompt": "أريد تأجيل موعد سحب الدم المنزلي.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-342",
+    "category": "handoff",
+    "prompt": "لو سمحت، أريد تأجيل موعد سحب الدم المنزلي.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-343",
+    "category": "handoff",
+    "prompt": "أريد تأجيل موعد سحب الدم المنزلي. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-344",
+    "category": "handoff",
+    "prompt": "من فضلك، أريد تأجيل موعد سحب الدم المنزلي.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-345",
+    "category": "handoff",
+    "prompt": "أريد تأجيل موعد سحب الدم المنزلي. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-346",
+    "category": "handoff",
+    "prompt": "أريد تقديم موعد الزيارة المنزلية.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-347",
+    "category": "handoff",
+    "prompt": "لو سمحت، أريد تقديم موعد الزيارة المنزلية.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-348",
+    "category": "handoff",
+    "prompt": "أريد تقديم موعد الزيارة المنزلية. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-349",
+    "category": "handoff",
+    "prompt": "من فضلك، أريد تقديم موعد الزيارة المنزلية.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-350",
+    "category": "handoff",
+    "prompt": "أريد تقديم موعد الزيارة المنزلية. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-351",
+    "category": "collection_mixed",
+    "prompt": "دفعت قيمة الحجز لكنه لا يظهر في التطبيق.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-352",
+    "category": "collection_mixed",
+    "prompt": "لو سمحت، دفعت قيمة الحجز لكنه لا يظهر في التطبيق.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-353",
+    "category": "collection_mixed",
+    "prompt": "دفعت قيمة الحجز لكنه لا يظهر في التطبيق. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-354",
+    "category": "collection_mixed",
+    "prompt": "من فضلك، دفعت قيمة الحجز لكنه لا يظهر في التطبيق.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-355",
+    "category": "collection_mixed",
+    "prompt": "دفعت قيمة الحجز لكنه لا يظهر في التطبيق. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-356",
+    "category": "collection_mixed",
+    "prompt": "تم خصم المبلغ ولم يتأكد الحجز.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-357",
+    "category": "collection_mixed",
+    "prompt": "لو سمحت، تم خصم المبلغ ولم يتأكد الحجز.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-358",
+    "category": "collection_mixed",
+    "prompt": "تم خصم المبلغ ولم يتأكد الحجز. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-359",
+    "category": "collection_mixed",
+    "prompt": "من فضلك، تم خصم المبلغ ولم يتأكد الحجز.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-360",
+    "category": "collection_mixed",
+    "prompt": "تم خصم المبلغ ولم يتأكد الحجز. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-361",
+    "category": "collection_mixed",
+    "prompt": "دفعت للاستشارة ولم يصلني تأكيد.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-362",
+    "category": "collection_mixed",
+    "prompt": "لو سمحت، دفعت للاستشارة ولم يصلني تأكيد.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-363",
+    "category": "collection_mixed",
+    "prompt": "دفعت للاستشارة ولم يصلني تأكيد. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-364",
+    "category": "collection_mixed",
+    "prompt": "من فضلك، دفعت للاستشارة ولم يصلني تأكيد.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-365",
+    "category": "collection_mixed",
+    "prompt": "دفعت للاستشارة ولم يصلني تأكيد. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-366",
+    "category": "collection_mixed",
+    "prompt": "المبلغ انخصم لكن الحجز غير موجود.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-367",
+    "category": "collection_mixed",
+    "prompt": "لو سمحت، المبلغ انخصم لكن الحجز غير موجود.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-368",
+    "category": "collection_mixed",
+    "prompt": "المبلغ انخصم لكن الحجز غير موجود. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-369",
+    "category": "collection_mixed",
+    "prompt": "من فضلك، المبلغ انخصم لكن الحجز غير موجود.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-370",
+    "category": "collection_mixed",
+    "prompt": "المبلغ انخصم لكن الحجز غير موجود. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-371",
+    "category": "collection_mixed",
+    "prompt": "أرسلت الدفع ولم يتم إنشاء الموعد.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-372",
+    "category": "collection_mixed",
+    "prompt": "لو سمحت، أرسلت الدفع ولم يتم إنشاء الموعد.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-373",
+    "category": "collection_mixed",
+    "prompt": "أرسلت الدفع ولم يتم إنشاء الموعد. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-374",
+    "category": "collection_mixed",
+    "prompt": "من فضلك، أرسلت الدفع ولم يتم إنشاء الموعد.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-375",
+    "category": "collection_mixed",
+    "prompt": "أرسلت الدفع ولم يتم إنشاء الموعد. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-376",
+    "category": "collection_mixed",
+    "prompt": "تم الدفع لكن لم يظهر لي الحجز.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-377",
+    "category": "collection_mixed",
+    "prompt": "لو سمحت، تم الدفع لكن لم يظهر لي الحجز.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-378",
+    "category": "collection_mixed",
+    "prompt": "تم الدفع لكن لم يظهر لي الحجز. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-379",
+    "category": "collection_mixed",
+    "prompt": "من فضلك، تم الدفع لكن لم يظهر لي الحجز.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-380",
+    "category": "collection_mixed",
+    "prompt": "تم الدفع لكن لم يظهر لي الحجز. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-381",
+    "category": "collection_mixed",
+    "prompt": "عندي عملية دفع ناجحة والحجز لم يكتمل.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-382",
+    "category": "collection_mixed",
+    "prompt": "لو سمحت، عندي عملية دفع ناجحة والحجز لم يكتمل.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-383",
+    "category": "collection_mixed",
+    "prompt": "عندي عملية دفع ناجحة والحجز لم يكتمل. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-384",
+    "category": "collection_mixed",
+    "prompt": "من فضلك، عندي عملية دفع ناجحة والحجز لم يكتمل.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-385",
+    "category": "collection_mixed",
+    "prompt": "عندي عملية دفع ناجحة والحجز لم يكتمل. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-386",
+    "category": "collection_mixed",
+    "prompt": "دفعت مرتين ولم يظهر موعدي.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-387",
+    "category": "collection_mixed",
+    "prompt": "لو سمحت، دفعت مرتين ولم يظهر موعدي.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-388",
+    "category": "collection_mixed",
+    "prompt": "دفعت مرتين ولم يظهر موعدي. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-389",
+    "category": "collection_mixed",
+    "prompt": "من فضلك، دفعت مرتين ولم يظهر موعدي.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-390",
+    "category": "collection_mixed",
+    "prompt": "دفعت مرتين ولم يظهر موعدي. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-391",
+    "category": "collection_mixed",
+    "prompt": "المبلغ انسحب من البطاقة ولم أحصل على الخدمة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-392",
+    "category": "collection_mixed",
+    "prompt": "لو سمحت، المبلغ انسحب من البطاقة ولم أحصل على الخدمة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-393",
+    "category": "collection_mixed",
+    "prompt": "المبلغ انسحب من البطاقة ولم أحصل على الخدمة. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-394",
+    "category": "collection_mixed",
+    "prompt": "من فضلك، المبلغ انسحب من البطاقة ولم أحصل على الخدمة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-395",
+    "category": "collection_mixed",
+    "prompt": "المبلغ انسحب من البطاقة ولم أحصل على الخدمة. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-396",
+    "category": "collection_mixed",
+    "prompt": "أحتاج مساعدة لأن الدفع لم يكتمل بعدها الحجز.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-397",
+    "category": "collection_mixed",
+    "prompt": "لو سمحت، أحتاج مساعدة لأن الدفع لم يكتمل بعدها الحجز.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-398",
+    "category": "collection_mixed",
+    "prompt": "أحتاج مساعدة لأن الدفع لم يكتمل بعدها الحجز. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-399",
+    "category": "collection_mixed",
+    "prompt": "من فضلك، أحتاج مساعدة لأن الدفع لم يكتمل بعدها الحجز.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-400",
+    "category": "collection_mixed",
+    "prompt": "أحتاج مساعدة لأن الدفع لم يكتمل بعدها الحجز. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-401",
+    "category": "collection_mixed",
+    "prompt": "أريد طلب استرداد المبلغ.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-402",
+    "category": "collection_mixed",
+    "prompt": "لو سمحت، أريد طلب استرداد المبلغ.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-403",
+    "category": "collection_mixed",
+    "prompt": "أريد طلب استرداد المبلغ. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-404",
+    "category": "collection_mixed",
+    "prompt": "من فضلك، أريد طلب استرداد المبلغ.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-405",
+    "category": "collection_mixed",
+    "prompt": "أريد طلب استرداد المبلغ. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-406",
+    "category": "collection_mixed",
+    "prompt": "أرغب في استرجاع قيمة الحجز.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-407",
+    "category": "collection_mixed",
+    "prompt": "لو سمحت، أرغب في استرجاع قيمة الحجز.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-408",
+    "category": "collection_mixed",
+    "prompt": "أرغب في استرجاع قيمة الحجز. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-409",
+    "category": "collection_mixed",
+    "prompt": "من فضلك، أرغب في استرجاع قيمة الحجز.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-410",
+    "category": "collection_mixed",
+    "prompt": "أرغب في استرجاع قيمة الحجز. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-411",
+    "category": "collection_mixed",
+    "prompt": "أحتاج أرفع طلب استرداد دفعة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-412",
+    "category": "collection_mixed",
+    "prompt": "لو سمحت، أحتاج أرفع طلب استرداد دفعة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-413",
+    "category": "collection_mixed",
+    "prompt": "أحتاج أرفع طلب استرداد دفعة. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-414",
+    "category": "collection_mixed",
+    "prompt": "من فضلك، أحتاج أرفع طلب استرداد دفعة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-415",
+    "category": "collection_mixed",
+    "prompt": "أحتاج أرفع طلب استرداد دفعة. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-416",
+    "category": "collection_mixed",
+    "prompt": "أريد استرجاع المبلغ الذي دفعته.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-417",
+    "category": "collection_mixed",
+    "prompt": "لو سمحت، أريد استرجاع المبلغ الذي دفعته.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-418",
+    "category": "collection_mixed",
+    "prompt": "أريد استرجاع المبلغ الذي دفعته. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-419",
+    "category": "collection_mixed",
+    "prompt": "من فضلك، أريد استرجاع المبلغ الذي دفعته.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-420",
+    "category": "collection_mixed",
+    "prompt": "أريد استرجاع المبلغ الذي دفعته. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-421",
+    "category": "collection_mixed",
+    "prompt": "كيف أقدم طلب استرداد للمبلغ المدفوع؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-422",
+    "category": "collection_mixed",
+    "prompt": "لو سمحت، كيف أقدم طلب استرداد للمبلغ المدفوع؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-423",
+    "category": "collection_mixed",
+    "prompt": "كيف أقدم طلب استرداد للمبلغ المدفوع؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-424",
+    "category": "collection_mixed",
+    "prompt": "من فضلك، كيف أقدم طلب استرداد للمبلغ المدفوع؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-425",
+    "category": "collection_mixed",
+    "prompt": "كيف أقدم طلب استرداد للمبلغ المدفوع؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-426",
+    "category": "collection_mixed",
+    "prompt": "أبغى أسترجع قيمة الطلب.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-427",
+    "category": "collection_mixed",
+    "prompt": "لو سمحت، أبغى أسترجع قيمة الطلب.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-428",
+    "category": "collection_mixed",
+    "prompt": "أبغى أسترجع قيمة الطلب. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-429",
+    "category": "collection_mixed",
+    "prompt": "من فضلك، أبغى أسترجع قيمة الطلب.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-430",
+    "category": "collection_mixed",
+    "prompt": "أبغى أسترجع قيمة الطلب. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-431",
+    "category": "collection_mixed",
+    "prompt": "أريد إلغاء الطلب وطلب استرداد المبلغ.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-432",
+    "category": "collection_mixed",
+    "prompt": "لو سمحت، أريد إلغاء الطلب وطلب استرداد المبلغ.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-433",
+    "category": "collection_mixed",
+    "prompt": "أريد إلغاء الطلب وطلب استرداد المبلغ. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-434",
+    "category": "collection_mixed",
+    "prompt": "من فضلك، أريد إلغاء الطلب وطلب استرداد المبلغ.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-435",
+    "category": "collection_mixed",
+    "prompt": "أريد إلغاء الطلب وطلب استرداد المبلغ. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-436",
+    "category": "collection_mixed",
+    "prompt": "أحتاج مساعدة بخصوص استرجاع مبلغ الدفع.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-437",
+    "category": "collection_mixed",
+    "prompt": "لو سمحت، أحتاج مساعدة بخصوص استرجاع مبلغ الدفع.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-438",
+    "category": "collection_mixed",
+    "prompt": "أحتاج مساعدة بخصوص استرجاع مبلغ الدفع. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-439",
+    "category": "collection_mixed",
+    "prompt": "من فضلك، أحتاج مساعدة بخصوص استرجاع مبلغ الدفع.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-440",
+    "category": "collection_mixed",
+    "prompt": "أحتاج مساعدة بخصوص استرجاع مبلغ الدفع. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-441",
+    "category": "collection_mixed",
+    "prompt": "أرغب في استرداد رسوم الخدمة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-442",
+    "category": "collection_mixed",
+    "prompt": "لو سمحت، أرغب في استرداد رسوم الخدمة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-443",
+    "category": "collection_mixed",
+    "prompt": "أرغب في استرداد رسوم الخدمة. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-444",
+    "category": "collection_mixed",
+    "prompt": "من فضلك، أرغب في استرداد رسوم الخدمة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-445",
+    "category": "collection_mixed",
+    "prompt": "أرغب في استرداد رسوم الخدمة. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-446",
+    "category": "collection_mixed",
+    "prompt": "أريد متابعة طلب استرداد مالي.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-447",
+    "category": "collection_mixed",
+    "prompt": "لو سمحت، أريد متابعة طلب استرداد مالي.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-448",
+    "category": "collection_mixed",
+    "prompt": "أريد متابعة طلب استرداد مالي. ممكن تساعدني؟",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-449",
+    "category": "collection_mixed",
+    "prompt": "من فضلك، أريد متابعة طلب استرداد مالي.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-450",
+    "category": "collection_mixed",
+    "prompt": "أريد متابعة طلب استرداد مالي. أرجو المساعدة.",
+    "expected_action": "handoff"
+  },
+  {
+    "id": "V9-451",
+    "category": "ambiguous",
+    "prompt": "كم السعر؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-452",
+    "category": "ambiguous",
+    "prompt": "لو سمحت، كم السعر؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-453",
+    "category": "ambiguous",
+    "prompt": "كم السعر؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-454",
+    "category": "ambiguous",
+    "prompt": "من فضلك، كم السعر؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-455",
+    "category": "ambiguous",
+    "prompt": "كم السعر؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-456",
+    "category": "ambiguous",
+    "prompt": "أبغى أعرف التكلفة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-457",
+    "category": "ambiguous",
+    "prompt": "لو سمحت، أبغى أعرف التكلفة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-458",
+    "category": "ambiguous",
+    "prompt": "أبغى أعرف التكلفة. ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-459",
+    "category": "ambiguous",
+    "prompt": "من فضلك، أبغى أعرف التكلفة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-460",
+    "category": "ambiguous",
+    "prompt": "أبغى أعرف التكلفة. أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-461",
+    "category": "ambiguous",
+    "prompt": "كيف أقدر أستفيد؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-462",
+    "category": "ambiguous",
+    "prompt": "لو سمحت، كيف أقدر أستفيد؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-463",
+    "category": "ambiguous",
+    "prompt": "كيف أقدر أستفيد؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-464",
+    "category": "ambiguous",
+    "prompt": "من فضلك، كيف أقدر أستفيد؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-465",
+    "category": "ambiguous",
+    "prompt": "كيف أقدر أستفيد؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-466",
+    "category": "ambiguous",
+    "prompt": "عندي سؤال عن الخدمة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-467",
+    "category": "ambiguous",
+    "prompt": "لو سمحت، عندي سؤال عن الخدمة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-468",
+    "category": "ambiguous",
+    "prompt": "عندي سؤال عن الخدمة. ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-469",
+    "category": "ambiguous",
+    "prompt": "من فضلك، عندي سؤال عن الخدمة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-470",
+    "category": "ambiguous",
+    "prompt": "عندي سؤال عن الخدمة. أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-471",
+    "category": "ambiguous",
+    "prompt": "أبغى أطلبها.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-472",
+    "category": "ambiguous",
+    "prompt": "لو سمحت، أبغى أطلبها.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-473",
+    "category": "ambiguous",
+    "prompt": "أبغى أطلبها. ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-474",
+    "category": "ambiguous",
+    "prompt": "من فضلك، أبغى أطلبها.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-475",
+    "category": "ambiguous",
+    "prompt": "أبغى أطلبها. أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-476",
+    "category": "ambiguous",
+    "prompt": "كم الرسوم؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-477",
+    "category": "ambiguous",
+    "prompt": "لو سمحت، كم الرسوم؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-478",
+    "category": "ambiguous",
+    "prompt": "كم الرسوم؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-479",
+    "category": "ambiguous",
+    "prompt": "من فضلك، كم الرسوم؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-480",
+    "category": "ambiguous",
+    "prompt": "كم الرسوم؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-481",
+    "category": "ambiguous",
+    "prompt": "متى الموعد؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-482",
+    "category": "ambiguous",
+    "prompt": "لو سمحت، متى الموعد؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-483",
+    "category": "ambiguous",
+    "prompt": "متى الموعد؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-484",
+    "category": "ambiguous",
+    "prompt": "من فضلك، متى الموعد؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-485",
+    "category": "ambiguous",
+    "prompt": "متى الموعد؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-486",
+    "category": "ambiguous",
+    "prompt": "أحتاج مساعدة في طلبي.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-487",
+    "category": "ambiguous",
+    "prompt": "لو سمحت، أحتاج مساعدة في طلبي.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-488",
+    "category": "ambiguous",
+    "prompt": "أحتاج مساعدة في طلبي. ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-489",
+    "category": "ambiguous",
+    "prompt": "من فضلك، أحتاج مساعدة في طلبي.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-490",
+    "category": "ambiguous",
+    "prompt": "أحتاج مساعدة في طلبي. أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-491",
+    "category": "ambiguous",
+    "prompt": "هل هذا متاح؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-492",
+    "category": "ambiguous",
+    "prompt": "لو سمحت، هل هذا متاح؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-493",
+    "category": "ambiguous",
+    "prompt": "هل هذا متاح؟ ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-494",
+    "category": "ambiguous",
+    "prompt": "من فضلك، هل هذا متاح؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-495",
+    "category": "ambiguous",
+    "prompt": "هل هذا متاح؟ أرجو المساعدة.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-496",
+    "category": "ambiguous",
+    "prompt": "أبغى أعرف التفاصيل.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-497",
+    "category": "ambiguous",
+    "prompt": "لو سمحت، أبغى أعرف التفاصيل.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-498",
+    "category": "ambiguous",
+    "prompt": "أبغى أعرف التفاصيل. ممكن تساعدني؟",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-499",
+    "category": "ambiguous",
+    "prompt": "من فضلك، أبغى أعرف التفاصيل.",
+    "expected_action": "reply"
+  },
+  {
+    "id": "V9-500",
+    "category": "ambiguous",
+    "prompt": "أبغى أعرف التفاصيل. أرجو المساعدة.",
+    "expected_action": "reply"
+  }
+]

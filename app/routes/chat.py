@@ -15,8 +15,7 @@ from app.services.conversation_memory import (
     save_turn,
 )
 from app.services.intent import classify_intent
-from app.llm.claude import CASUAL_MARKER
-from app.services.rag import answer_question, build_search_query, executor
+from app.services.rag import answer_question, build_search_query
 
 
 router = APIRouter()
@@ -285,60 +284,22 @@ def make_response(
     }
 
 
-# Deterministic detection: these requests should always use the handoff action.
-LAB_READING_PHRASES = (
-    "قراءة التحاليل",
-    "قراءة التحليل",
-    "تفسير التحاليل",
-    "تفسير التحليل",
-    "نتيجة تحليل",
-    "نتائج التحاليل",
-    "اقرا تحاليلي",
-    "اقرأ تحاليلي",
-    "ابغى احد يقرا",
-    "أبغى أحد يقرأ",
-    "ابا احد يقرا",
-    "أبا أحد يقرا",
-    "أحد يقراها",
-    "احد يقراها",
-    "اقرا النتيجة",
-    "اقرأ النتيجة",
-    "فسر التحليل",
-    "فسّر التحليل",
-    "فسرلي التحليل",
-    "فسر لي التحليل",
-    "interpret my lab",
-    "read my lab result",
-    "read my test result",
-)
-
-
-def is_lab_reading_request(message: str) -> bool:
-    normalized = " ".join((message or "").lower().split())
-    return any(phrase in normalized for phrase in LAB_READING_PHRASES)
-
-
 def _is_arabic(text: str) -> bool:
     return bool(re.search(r"[\u0600-\u06FF]", text or ""))
 
 
 def _handoff_answer(message: str) -> str:
-    if is_lab_reading_request(message):
-        return (
-            "يسعدنا مساعدتك في قراءة نتائج التحاليل. "
-            "سيتم تحويلك الآن إلى فريق خدمة العملاء لاستكمال الإجراء 🌷"
-        )
-
     if _is_arabic(message):
         return (
-            "شكرًا لك، استلمنا المعلومات المطلوبة. "
+            "شكرًا لك، استلمنا طلبك. "
             "سيتم تحويل محادثتك إلى فريق خدمة العملاء "
             "لمتابعة طلبك. يرجى الانتظار."
         )
 
     return (
-        "Thank you, we have received your request. Your conversation is "
-        "being transferred to our customer service team. Please wait."
+        "Thank you, we have received your request. "
+        "Your conversation is being transferred to our "
+        "customer service team. Please wait."
     )
 
 
@@ -425,48 +386,45 @@ def chat(
             "No conversation_id provided; temporary memory is disabled for this request."
         )
 
-    search_query_future = None
-    early_answer_future = None
+    # Understand the customer's intent before starting RAG work.
+    decision = classify_intent(
+        message=message,
+        conversation_context=conversation_context,
+    )
 
-    # Force handoff for lab-reading requests before calling the AI intent classifier.
-    if is_lab_reading_request(message):
-        intent = "handoff"
-        logger.info(
-            "Forced lab-reading handoff: client_id=%s conversation_id_present=%s",
-            client.id,
-            bool(conversation_id),
-        )
-    else:
-        # The query rewrite does not depend on the intent, so both Claude
-        # calls run at the same time instead of one after the other.
-        # On a handoff the rewrite result is simply not used.
-        search_query_future = executor.submit(
-            build_search_query,
-            message,
-            client_config=client.ai_config,
-            conversation_context=conversation_context,
-        )
+    intent = decision["action"]
 
-        # First message of a conversation: the rewrite does not change what
-        # retrieval finds (measured: same facts, same rank), so start the
-        # answer from the user's own words now instead of waiting ~0.8 s for
-        # it. Follow-ups keep waiting: there the rewrite resolves "كم سعره؟".
-        if not conversation_context:
-            early_answer_future = executor.submit(
-                answer_question,
-                question=message,
-                client_id=client.id,
-                client_config=client.ai_config,
-                conversation_context="",
-                search_query=message,
+    logger.info(
+        "Intent decision: client_id=%s intent=%s action=%s reason=%s",
+        client.id,
+        decision["intent"],
+        decision["action"],
+        decision["reason"],
+    )
+
+    if decision.get("needs_clarification"):
+        clarification_answer = (
+            decision.get("clarification_question", "").strip()
+            or (
+                "أكيد، ممكن توضح لي أكثر ما الذي تحتاج المساعدة فيه؟"
+                if _is_arabic(message)
+                else "Of course. Could you tell me a little more about what you need help with?"
             )
-
-        intent = classify_intent(
-            message=message,
-            conversation_context=conversation_context,
         )
 
-    logger.info("Intent classified: client_id=%s intent=%s", client.id, intent)
+        save_turn(
+            client.id,
+            conversation_id,
+            message,
+            clarification_answer,
+        )
+        _log_timing(client.id, "clarification", started)
+
+        return make_response(
+            action="reply",
+            answer=clarification_answer,
+            status="CLARIFICATION_REQUIRED",
+        )
 
     if intent == "handoff":
         # An early answer, if one was started, is simply not used.
@@ -477,33 +435,28 @@ def chat(
 
     search_query = None
 
-    if search_query_future is not None:
-        try:
-            search_query = search_query_future.result()
-        except Exception:
-            # answer_question() will rewrite the query itself.
-            logger.exception("Parallel query rewrite failed: client_id=%s", client.id)
-
-    result = None
-    path = "standard"
-
-    # Casual messages ("هلا", "شكراً") get the casual reply, not the early
-    # answer; everything else uses the early answer when there is one.
-    if early_answer_future is not None and search_query != CASUAL_MARKER:
-        try:
-            result = early_answer_future.result()
-            path = "early"
-        except Exception:
-            logger.exception("Early answer failed: client_id=%s", client.id)
-
-    if result is None:
-        result = answer_question(
-            question=message,
-            client_id=client.id,
+    try:
+        search_query = build_search_query(
+            message,
             client_config=client.ai_config,
             conversation_context=conversation_context,
-            search_query=search_query,
         )
+    except Exception:
+        # answer_question can still perform its own query preparation.
+        logger.exception(
+            "Search query preparation failed: client_id=%s",
+            client.id,
+        )
+
+    result = answer_question(
+        question=message,
+        client_id=client.id,
+        client_config=client.ai_config,
+        conversation_context=conversation_context,
+        search_query=search_query,
+    )
+
+    path = "standard"
 
     if result.get("status") == "RELATED_BUT_UNKNOWN":
         # Gap tracking is analytics: never fail the user's answer over it.

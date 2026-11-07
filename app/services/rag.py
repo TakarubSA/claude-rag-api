@@ -369,8 +369,8 @@ def build_search_query(
     """
     Turn the latest message into a standalone search query (or CASUAL_MARKER).
 
-    Public so the chat route can start it in parallel with intent
-    classification and hand the result to answer_question().
+    The chat route calls this after intent classification and passes
+    the resolved query into the RAG pipeline.
     """
     cleaned_question = _clean_text(question)
 
@@ -534,7 +534,50 @@ def answer_question(
         default=None,
     )
 
-    # Claude gets the actual latest message and history as separate inputs.
+    # Evaluate whether the retrieved evidence or configured business
+    # rules can support a useful answer. Search results are not treated
+    # as a complete catalogue.
+    evidence_status = check_context_relevance(
+        question=search_query or cleaned_question,
+        context=knowledge_context,
+        client_config=client_config,
+        history=history,
+    )
+
+    logger.info(
+        "Evidence evaluation: client_id=%s status=%s result_count=%s",
+        client_id,
+        evidence_status,
+        len(results),
+    )
+
+    if evidence_status == "NOT_ANSWERABLE":
+        gap_type = classify_knowledge_gap(
+            question=search_query or cleaned_question,
+            context=knowledge_context,
+            client_config=client_config,
+            history=history,
+        )
+
+        logger.info(
+            "Knowledge gap: client_id=%s type=%s",
+            client_id,
+            gap_type,
+        )
+
+        fallback = generate_fallback_answer(
+            question=cleaned_question,
+            gap_type=gap_type,
+            client_config=client_config,
+        )
+
+        return {
+            "answer": _clean_answer_format(fallback),
+            "best_distance": best_distance,
+            "status": "SEARCH_ERROR" if search_failed else gap_type,
+        }
+
+    # Claude receives the actual latest message and history separately.
     grounded_result = _generate_grounded_answer(
         question=cleaned_question,
         context=knowledge_context,
@@ -551,9 +594,10 @@ def answer_question(
         return grounded_result
 
     gap_type = classify_knowledge_gap(
-        question=cleaned_question,
+        question=search_query or cleaned_question,
         context=knowledge_context,
         client_config=client_config,
+        history=history,
     )
 
     logger.info("Knowledge gap: client_id=%s type=%s", client_id, gap_type)
