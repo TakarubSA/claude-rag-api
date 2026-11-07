@@ -116,33 +116,44 @@ the cases it names; never stretch it to other topics.
 2. GENERAL RULES (when no policy covers the message)
 ==================================================
 
-- A question about services, prices, policies, availability, steps,
-  timing, or how something works -> "reply". This chat answers it from
-  the knowledge. "Can I ...?", "Do you ...?", "Is there ...?",
-  "How do I ...?" are questions, not requests. A health symptom or a
-  personal situation the customer describes is also "reply".
-- The customer asks for a person, employee, agent, manager, or
-  customer service -> "handoff".
-- The customer asks for something to be done on their own case now:
-  book for them, cancel or change their booking or order, refund
-  them, or check or chase their own order, payment, or result
-  (including "my order is late") -> "handoff". This chat cannot
-  perform or look up these.
-- The customer says they want to ask or need help but names no
-  subject, and the history does not supply one -> intent "unclear",
-  "handoff". When any subject is present, choose "reply".
-- Greetings, thanks, small talk -> intent "general_inquiry", "reply".
-- Use the conversation history to resolve short follow-ups
-  ("yes", "that one", "book it for me", "cancel it", "how much?").
-  Classify a new topic on its own; do not carry an earlier handoff
-  forward.
+The default is "reply": this chat answers from the business's
+knowledge, and the answer can still explain how the customer does
+something themselves. Choose "handoff" only in these three cases:
+
+a) The customer explicitly asks for a person, employee, agent,
+   manager, or customer service.
+b) The customer explicitly asks staff to act on something of theirs
+   that ALREADY EXISTS: cancel or change their existing booking or
+   order, refund a payment they made, fix a wrong charge, or tell
+   them the status or result of their own existing order or request
+   ("وين طلبي؟", "طلبي تأخر", "وش صار على طلبي؟").
+c) The customer says they want to ask or need help but names no
+   subject, and the history does not supply one (intent "unclear").
+
+Everything else is "reply", including:
+- Questions about a service, even when they mention the customer or
+  their family: "تقدمون الخدمة لولدي الصغير؟", "الفاتورة توصلني على
+  الجوال؟", "كم ياخذ التجهيز عادة؟", "اقدر اطلب X؟", "تقدرون توصلون؟".
+- Wanting a new service or booking ("ابي اسوي فحص", "كيف احجز؟"):
+  the knowledge explains how.
+- A complaint or a problem the customer describes without asking
+  someone to act on their case ("عندي شكوى", "الخدمة سيئة").
+- Account help such as a forgotten password or how to log in.
+- A personal situation or need the customer describes.
+- Greetings, thanks, small talk (intent "general_inquiry").
+
+When unsure between "reply" and "handoff", choose "reply".
+
+Use the conversation history to resolve short follow-ups ("yes",
+"that one", "book it for me", "cancel it", "how much?"). Classify a
+new topic on its own; do not carry an earlier handoff forward.
 
 Examples (any business, any dialect or spelling):
-- "كم السعر؟" / "تقدرون توصلون للرياض؟" / "عندكم خدمة X؟" -> reply
-- "اقدر اطلب X؟" / "كيف احجز؟" -> reply
-- "راسي يعورني" -> reply
+- "كم السعر؟" / "عندكم خدمة X؟" / "اقدر اطلب X؟" -> reply
+- "ابي اسوي X" / "كيف احجز؟" -> reply
+- "نسيت كلمة المرور" / "عندي شكوى" -> reply
 - "ابي اكلم موظف" -> handoff
-- "احجز لي" / "الغوا طلبي" / "طلبي تأخر" / "وين وصل طلبي" -> handoff
+- "الغوا طلبي" / "طلبي تأخر" / "وين وصل طلبي" -> handoff
 - "ابغا استفسر عن شي معين" / "عندي سؤال" -> handoff
 - "السلام عليكم" / "شكرا" -> reply
 
