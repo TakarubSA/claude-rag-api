@@ -147,6 +147,42 @@ def create_provider(
     return client_id
 
 
+def add_provider_login(
+    client_id: int,
+    name: str,
+    email: str,
+    password_hash: str,
+    anthropic_api_key: str | None,
+    credit_limit_usd: float | None,
+):
+    """Give an existing client a provider login. Key and limit change only when given."""
+    with engine.begin() as connection:
+        connection.execute(
+            text("""
+                INSERT INTO users (client_id, name, email, password_hash, role)
+                VALUES (:client_id, :name, :email, :password_hash, 'provider')
+            """),
+            {
+                "client_id": client_id,
+                "name": name,
+                "email": email,
+                "password_hash": password_hash,
+            },
+        )
+
+        if anthropic_api_key:
+            connection.execute(
+                text("UPDATE clients SET anthropic_api_key = :key WHERE id = :id"),
+                {"key": anthropic_api_key, "id": client_id},
+            )
+
+        if credit_limit_usd is not None:
+            connection.execute(
+                text("UPDATE clients SET credit_limit_usd = :limit WHERE id = :id"),
+                {"limit": credit_limit_usd, "id": client_id},
+            )
+
+
 def update_provider(client_id: int, changes: dict):
     allowed = {"anthropic_api_key", "credit_limit_usd"}
     changes = {k: v for k, v in changes.items() if k in allowed}

@@ -26,7 +26,9 @@ class LoginRequest(BaseModel):
 
 
 class CreateProviderRequest(BaseModel):
-    name: str = Field(min_length=1, max_length=200)
+    # Set client_id to give an existing client a login instead of creating a new client.
+    client_id: int | None = None
+    name: str = Field(default="", max_length=200)
     email: str = Field(min_length=3, max_length=200)
     password: str = Field(min_length=8, max_length=200)
     anthropic_api_key: str | None = None
@@ -130,11 +132,34 @@ def admin_create_provider(
     if repository.email_exists(email):
         raise HTTPException(status_code=409, detail="This email is already used")
 
+    api_key = (request.anthropic_api_key or "").strip() or None
+
+    if request.client_id is not None:
+        client = _provider_or_404(request.client_id)
+
+        if client["email"]:
+            raise HTTPException(status_code=409, detail="This client already has a login account")
+
+        repository.add_provider_login(
+            client_id=request.client_id,
+            name=request.name.strip() or client["name"],
+            email=email,
+            password_hash=hash_password(request.password),
+            anthropic_api_key=api_key,
+            credit_limit_usd=request.credit_limit_usd,
+        )
+        return repository.get_provider(request.client_id)
+
+    name = request.name.strip()
+
+    if not name:
+        raise HTTPException(status_code=422, detail="Name is required for a new client")
+
     client_id = repository.create_provider(
-        name=request.name.strip(),
+        name=name,
         email=email,
         password_hash=hash_password(request.password),
-        anthropic_api_key=(request.anthropic_api_key or "").strip() or None,
+        anthropic_api_key=api_key,
         credit_limit_usd=request.credit_limit_usd,
     )
 
