@@ -1,4 +1,3 @@
-import contextvars
 import logging
 import os
 import re
@@ -17,7 +16,7 @@ from app.llm.claude import (
     generate_answer,
     generate_casual_answer,
     generate_fallback_answer,
-    check_context_relevance,
+    evaluate_question,
     classify_knowledge_gap,
 )
 
@@ -569,39 +568,40 @@ def answer_question(
         default=None,
     )
 
-    # Evaluate whether the retrieved evidence or configured business
-    # rules can support a useful answer. Search results are not treated
-    # as a complete catalogue.
-    # The check and the answer are independent Claude calls, so they run
-    # at the same time; the answer is discarded if the check says the
-    # question is not answerable. copy_context() keeps this request's
-    # provider key and usage tracking in the worker thread.
-    evidence_future = executor.submit(
-        contextvars.copy_context().run,
-        check_context_relevance,
+    # Evaluate question completeness and evidence together after retrieval.
+    # This prevents a named-but-unknown subject from being mistaken for an
+    # incomplete question, and avoids generating an answer that will be discarded.
+    evaluation = evaluate_question(
         question=search_query or cleaned_question,
+        latest_message=cleaned_question,
         context=knowledge_context,
         client_config=client_config,
         history=history,
     )
 
-    grounded_result = _generate_grounded_answer(
-        question=cleaned_question,
-        context=knowledge_context,
-        client_config=client_config,
-        best_distance=best_distance,
-        history=history,
-        resolved_question=search_query,
-    )
-
-    evidence_status = evidence_future.result()
+    question_status = evaluation["question_status"]
+    evidence_status = evaluation["evidence_status"]
 
     logger.info(
-        "Evidence evaluation: client_id=%s status=%s result_count=%s",
+        "Question evaluation: client_id=%s question_status=%s "
+        "evidence_status=%s result_count=%s",
         client_id,
+        question_status,
         evidence_status,
         len(results),
     )
+
+    if question_status == "INCOMPLETE":
+        clarification = evaluation["clarification_question"] or (
+            "يرجى تحديد العنصر الذي تقصده حتى أتمكن من مساعدتك."
+            if re.search(r"[\u0600-\u06FF]", cleaned_question)
+            else "Please specify which item you mean so I can help."
+        )
+        return {
+            "answer": _clean_answer_format(clarification),
+            "best_distance": best_distance,
+            "status": "CLARIFICATION_REQUIRED",
+        }
 
     if evidence_status == "NOT_ANSWERABLE":
         gap_type = classify_knowledge_gap(
@@ -628,6 +628,15 @@ def answer_question(
             "best_distance": best_distance,
             "status": "SEARCH_ERROR" if search_failed else gap_type,
         }
+
+    grounded_result = _generate_grounded_answer(
+        question=cleaned_question,
+        context=knowledge_context,
+        client_config=client_config,
+        best_distance=best_distance,
+        history=history,
+        resolved_question=search_query,
+    )
 
     if grounded_result:
         if search_failed or not results:

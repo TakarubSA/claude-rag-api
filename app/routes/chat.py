@@ -470,32 +470,8 @@ def _answer(client, request_id, request, message, conversation_id, started):
         decision["reason"],
     )
 
-    if decision.get("needs_clarification"):
-        clarification_answer = (
-            decision.get("clarification_question", "").strip()
-            or (
-                "أكيد، ممكن توضح لي أكثر ما الذي تحتاج المساعدة فيه؟"
-                if _is_arabic(message)
-                else "Of course. Could you tell me a little more about what you need help with?"
-            )
-        )
-
-        save_turn(
-            client.id,
-            conversation_id,
-            message,
-            clarification_answer,
-        )
-        _log_timing(client.id, "clarification", started)
-        _record(client.id, request_id, conversation_id, message, clarification_answer,
-                "reply", "CLARIFICATION_REQUIRED", started, decision)
-
-        return make_response(
-            action="reply",
-            answer=clarification_answer,
-            status="CLARIFICATION_REQUIRED",
-        )
-
+    # Every "reply" goes to RAG; whether the question is missing a detail
+    # is decided there, after the search.
     if intent == "handoff":
         # The query rewrite, if still running, is simply not used.
         handoff_answer = _handoff_answer(message, decision.get("contact_details", ""))

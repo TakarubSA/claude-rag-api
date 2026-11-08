@@ -41,8 +41,6 @@ def fallback_decision(reason: str, message: str = "") -> dict:
         "intent": "unclear",
         "action": "reply",
         "reason": reason,
-        "needs_clarification": False,
-        "clarification_question": "",
         "contact_details": "",
     }
 
@@ -241,8 +239,6 @@ or after:
             "intent": intent,
             "action": action,
             "reason": reason[:300],
-            "needs_clarification": False,
-            "clarification_question": "",
             "contact_details": contact_details[:200],
         }
 
