@@ -3,7 +3,6 @@ import secrets
 from sqlalchemy import text
 
 from app.database.connection import engine
-from app.llm.usage import estimate_cost
 
 
 PROVIDER_COLUMNS = """
@@ -21,7 +20,8 @@ PROVIDER_COLUMNS = """
     (SELECT count(*) FROM knowledge WHERE client_id = c.id) AS knowledge_count,
     COALESCE(u.calls, 0) AS calls,
     COALESCE(u.input_tokens, 0) AS input_tokens,
-    COALESCE(u.output_tokens, 0) AS output_tokens
+    COALESCE(u.output_tokens, 0) AS output_tokens,
+    COALESCE(u.cost_usd, 0) AS cost_usd
 """
 
 USAGE_JOIN = """
@@ -29,7 +29,8 @@ USAGE_JOIN = """
         SELECT client_id,
                count(*) AS calls,
                sum(input_tokens) AS input_tokens,
-               sum(output_tokens) AS output_tokens
+               sum(output_tokens) AS output_tokens,
+               sum(cost_usd) AS cost_usd
         FROM claude_usage
         GROUP BY client_id
     ) u ON u.client_id = c.id
@@ -41,7 +42,7 @@ def _mask_key(key: str | None) -> str | None:
 
 
 def _provider_dict(row) -> dict:
-    cost = estimate_cost(row.input_tokens, row.output_tokens)
+    cost = round(float(row.cost_usd), 4)
     limit = float(row.credit_limit_usd) if row.credit_limit_usd is not None else None
 
     return {

@@ -8,6 +8,7 @@ from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.clients.repository import get_client_by_token
+from app.insights.repository import record_chat
 from app.knowledge.gaps_repository import insert_gap
 from app.llm.usage import use_client
 from app.services.history import drop_current_message, trim_history
@@ -317,6 +318,25 @@ def _handoff_answer(message: str, contact_details: str = "") -> str:
     return answer
 
 
+def _record(
+    client_id, request_id, conversation_id, message, answer, action, status,
+    started, decision=None, best_distance=None,
+):
+    record_chat(
+        client_id=client_id,
+        request_id=request_id,
+        conversation_id=conversation_id,
+        message=message,
+        answer=answer,
+        action=action,
+        status=status,
+        latency_ms=round((time.perf_counter() - started) * 1000),
+        intent=(decision or {}).get("intent"),
+        intent_reason=(decision or {}).get("reason"),
+        best_distance=best_distance,
+    )
+
+
 def _log_timing(client_id: int, path: str, started: float) -> None:
     logger.info(
         "Chat answered: client_id=%s path=%s total_ms=%.0f",
@@ -350,7 +370,7 @@ def chat(
         raise HTTPException(status_code=401, detail="Invalid token")
 
     # Claude calls for this request use the provider's key and are billed to it.
-    use_client(client.id, client.anthropic_api_key)
+    request_id = use_client(client.id, client.anthropic_api_key)
 
     started = time.perf_counter()
     message = request.message.strip()
@@ -370,6 +390,18 @@ def chat(
             detail="conversation_id must be 200 characters or fewer",
         )
 
+    try:
+        return _answer(client, request_id, request, message, conversation_id, started)
+    except HTTPException:
+        raise
+    except Exception:
+        # Still logged as an error so failures show on the dashboard.
+        _record(client.id, request_id, conversation_id, message, "",
+                "reply", "ERROR", started)
+        raise
+
+
+def _answer(client, request_id, request, message, conversation_id, started):
     if request.reset_conversation and conversation_id:
         clear_conversation(client.id, conversation_id)
 
@@ -455,6 +487,8 @@ def chat(
             clarification_answer,
         )
         _log_timing(client.id, "clarification", started)
+        _record(client.id, request_id, conversation_id, message, clarification_answer,
+                "reply", "CLARIFICATION_REQUIRED", started, decision)
 
         return make_response(
             action="reply",
@@ -467,6 +501,8 @@ def chat(
         handoff_answer = _handoff_answer(message, decision.get("contact_details", ""))
         save_turn(client.id, conversation_id, message, handoff_answer)
         _log_timing(client.id, "handoff", started)
+        _record(client.id, request_id, conversation_id, message, handoff_answer,
+                "handoff", "KNOWN", started, decision)
         return make_response(action="handoff", answer=handoff_answer)
 
     search_query = None
@@ -505,6 +541,9 @@ def chat(
         save_turn(client.id, conversation_id, message, answer)
 
     _log_timing(client.id, f"answer/{result.get('status')}", started)
+    _record(client.id, request_id, conversation_id, message, answer,
+            intent, result.get("status", "UNKNOWN"), started, decision,
+            result.get("best_distance"))
 
     return make_response(
         action=intent,

@@ -184,6 +184,7 @@ or after:
 
     try:
         response = create_message(
+            purpose="intent",
             model=MODEL,
             max_tokens=200,
             messages=[

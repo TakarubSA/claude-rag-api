@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.auth.security import (
@@ -9,6 +9,7 @@ from app.auth.security import (
     verify_password,
 )
 from app.dashboard import repository
+from app.insights import repository as insights
 from app.knowledge.ingestion import ingest_file
 
 
@@ -177,6 +178,36 @@ def admin_upload_knowledge(
     return _upload(client_id, request)
 
 
+@router.get("/admin/insights")
+def admin_insights(
+    days: int = Query(default=30, ge=1, le=365),
+    client_id: int | None = None,
+    _: dict = Depends(require_admin),
+):
+    if client_id is not None:
+        _provider_or_404(client_id)
+    return insights.get_insights(client_id, days)
+
+
+@router.get("/admin/providers/{client_id}/knowledge")
+def admin_list_knowledge(
+    client_id: int,
+    q: str = "",
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    _: dict = Depends(require_admin),
+):
+    _provider_or_404(client_id)
+    return insights.list_knowledge(client_id, q.strip(), limit, offset)
+
+
+@router.delete("/admin/providers/{client_id}/knowledge/{entry_id}")
+def admin_delete_knowledge(client_id: int, entry_id: int, _: dict = Depends(require_admin)):
+    if not insights.delete_knowledge(client_id, entry_id):
+        raise HTTPException(status_code=404, detail="Entry not found")
+    return {"deleted": entry_id}
+
+
 # ----------------------------------------------------------------------
 # Provider
 # ----------------------------------------------------------------------
@@ -192,3 +223,28 @@ def provider_upload_knowledge(
     user: dict = Depends(require_provider),
 ):
     return _upload(user["client_id"], request)
+
+
+@router.get("/provider/insights")
+def provider_insights(
+    days: int = Query(default=30, ge=1, le=365),
+    user: dict = Depends(require_provider),
+):
+    return insights.get_insights(user["client_id"], days)
+
+
+@router.get("/provider/knowledge")
+def provider_list_knowledge(
+    q: str = "",
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    user: dict = Depends(require_provider),
+):
+    return insights.list_knowledge(user["client_id"], q.strip(), limit, offset)
+
+
+@router.delete("/provider/knowledge/{entry_id}")
+def provider_delete_knowledge(entry_id: int, user: dict = Depends(require_provider)):
+    if not insights.delete_knowledge(user["client_id"], entry_id):
+        raise HTTPException(status_code=404, detail="Entry not found")
+    return {"deleted": entry_id}

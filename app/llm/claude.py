@@ -187,6 +187,7 @@ def _extract_text(response) -> str | None:
 def _call_claude(
     prompt: str,
     max_tokens: int,
+    purpose: str,
 ) -> str | None:
     """
     Central Claude API wrapper. Never raises into the RAG pipeline.
@@ -205,6 +206,7 @@ def _call_claude(
 
         try:
             response = create_message(
+                purpose=purpose,
                 model=MODEL,
                 max_tokens=budget,
                 messages=[
@@ -542,7 +544,7 @@ USER MESSAGE
 {cleaned}
 """
 
-    result = _call_claude(prompt, max_tokens=150)
+    result = _call_claude(prompt, max_tokens=150, purpose="rewrite_query")
 
     if not result:
         return cleaned or question
@@ -650,7 +652,7 @@ USER
 {_light_clean(question)}
 """
 
-    result = _call_claude(prompt, max_tokens=120)
+    result = _call_claude(prompt, max_tokens=120, purpose="casual_answer")
 
     if result:
         return result
@@ -876,7 +878,7 @@ USER QUESTION
 {question}
 {resolved_block}"""
 
-    result = _call_claude(prompt, max_tokens=700)
+    result = _call_claude(prompt, max_tokens=700, purpose="answer")
 
     if result:
         return result
@@ -1112,7 +1114,7 @@ or
 NOT_ANSWERABLE
 """
 
-    result = _call_claude(prompt, max_tokens=100)
+    result = _call_claude(prompt, max_tokens=100, purpose="relevance_check")
 
     return _parse_label(
         result,
@@ -1221,7 +1223,7 @@ USER QUESTION
 {question}
 """
 
-    result = _call_claude(prompt, max_tokens=40)
+    result = _call_claude(prompt, max_tokens=40, purpose="gap_classify")
 
     return _parse_label(
         result,
